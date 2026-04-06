@@ -9,6 +9,9 @@
 
 ## Table of Contents
 
+- [Business Use Cases](#business-use-cases)
+- [Who Will Buy This Software (SaaS)](#who-will-buy-this-software-saas)
+- [Entrepreneurship World Cup (EWC) 2026](#entrepreneurship-world-cup-ewc-2026)
 - [Phase 1 — Stock Exporter (Node Exporter for Markets)](#phase-1--stock-exporter-node-exporter-for-markets)
 - [Phase 2 — Multi-Exchange KPI Export to Prometheus](#phase-2--multi-exchange-kpi-export-to-prometheus)
 - [Phase 3 — Custom Prometheus (High-Frequency Scraping)](#phase-3--custom-prometheus-high-frequency-scraping)
@@ -53,6 +56,382 @@
    │  (Phase 1)      │ │ (Phase 2)       │ │ (Phase 2)         │
    └─────────────────┘ └─────────────────┘ └───────────────────┘
 ```
+
+---
+
+## Business Use Cases
+
+> **Why does Maher AI exist?** Financial markets generate massive volumes of data —
+> prices, volumes, order books, news, sentiment, regulatory filings — but no single
+> platform unifies this data into real-time, AI-explained, actionable intelligence.
+> Maher AI fills that gap using observability infrastructure (Prometheus + Loki + Grafana)
+> as the backbone for financial analytics.
+
+### UC-1: Real-Time Retail Trading Intelligence
+
+| Attribute | Detail |
+|-----------|--------|
+| **User** | Individual day-traders, swing traders (India, Saudi, US) |
+| **Problem** | Retail traders use 5–8 disconnected tools (charting, screener, news, alerts) and still miss actionable signals |
+| **Solution** | Single platform: live Prometheus metrics (1s resolution), AI-generated buy/sell signals with confidence scores, PromQL alerts pushed to Slack/SMS, Maher AI chat for instant analysis |
+| **Value** | Reduce missed opportunities by 60%+; replace $200+/mo in fragmented tool subscriptions with one platform |
+| **Revenue** | SaaS subscription (Pro tier: $49/mo) |
+
+### UC-2: Institutional Quantitative Analysis
+
+| Attribute | Detail |
+|-----------|--------|
+| **User** | Quant desks, proprietary trading firms, hedge funds |
+| **Problem** | Standard charting tools don't support custom metrics, 1-second resolution, or programmable alerting at scale |
+| **Solution** | Custom Prometheus fork (1s scraping), PromQL for programmable trade signal logic, custom Grafana fork with financial panels (candlestick, order book, ticker tape), REST + WebSocket APIs for system integration |
+| **Value** | 10x faster signal detection than polling-based tools; eliminate vendor lock-in with open-source core |
+| **Revenue** | Enterprise license ($499+/mo), custom deployment, API metering |
+
+### UC-3: Financial Advisory & Wealth Management
+
+| Attribute | Detail |
+|-----------|--------|
+| **User** | Registered investment advisors (RIAs), wealth managers, family offices |
+| **Problem** | Client reporting is manual; advisors lack AI-assisted portfolio monitoring and sentiment-aware recommendations |
+| **Solution** | Multi-client portfolio dashboards, AI-generated morning briefs, news sentiment overlayed on portfolio performance, automated client-ready PDF reports |
+| **Value** | Save 10+ hours/week on reporting; increase client retention through proactive, AI-driven communication |
+| **Revenue** | SaaS subscription (Enterprise tier), white-label licensing |
+
+### UC-4: Fintech Platform (API-First Data-as-a-Service)
+
+| Attribute | Detail |
+|-----------|--------|
+| **User** | Fintech startups, robo-advisors, trading app developers |
+| **Problem** | Building real-time market data + AI analysis infrastructure from scratch costs 12–18 months and $500K+ |
+| **Solution** | Maher AI API platform — REST endpoints for market data, WebSocket streams for real-time prices, sentiment scoring API, trade signal API, embeddable Grafana panels |
+| **Value** | Launch a trading feature in weeks instead of months; pay-per-query pricing scales with growth |
+| **Revenue** | API metering ($0.001–$0.01 per query), developer tier subscriptions |
+
+### UC-5: News & Sentiment Analytics
+
+| Attribute | Detail |
+|-----------|--------|
+| **User** | Equity research analysts, financial journalists, media companies |
+| **Problem** | Manually tracking 20+ news sources across 3 markets in 2 languages is impossible in real-time |
+| **Solution** | Loki-powered news ingestion (RSS, REST, WebSocket, social media) → structured logs with NLP sentiment scoring → LogQL queries → Grafana dashboards. Arabic NLP (AraBERT) for Saudi coverage. Source credibility scoring. |
+| **Value** | Real-time sentiment scoring across 20+ sources; identify market-moving news 5–30 minutes faster than manual monitoring |
+| **Revenue** | Data licensing, SaaS subscription, API access |
+
+### UC-6: Regulatory & Compliance Monitoring
+
+| Attribute | Detail |
+|-----------|--------|
+| **User** | Compliance officers, legal teams, regulatory bodies |
+| **Problem** | Regulatory filings (SEC, CMA, SEBI) are scattered; no unified alerting when material events occur |
+| **Solution** | Automated regulatory filing ingestion (SEC EDGAR, Tadawul CMA, NSE/BSE), LogQL alert rules for insider transactions, material events, corporate actions. Full audit trail stored in Loki. |
+| **Value** | Zero-delay compliance awareness; complete audit trail for regulatory reviews |
+| **Revenue** | Enterprise tier, compliance add-on module |
+
+### UC-7: Saudi Capital Market Participants
+
+| Attribute | Detail |
+|-----------|--------|
+| **User** | Saudi individual investors, Tadawul brokers, Saudi family offices |
+| **Problem** | No Arabic-first AI financial platform exists; Saudi investors rely on English-language tools that don't understand Tadawul market structure or Saudi regulations |
+| **Solution** | Tadawul-native stock exporter, Arabic NLP (AraBERT) for Saudi news, CMA regulatory feed integration, Arabic Maher AI chat persona, Vision 2030-aligned platform |
+| **Value** | First Arabic-first AI financial intelligence platform serving Saudi Arabia's $2.8T capital market |
+| **Revenue** | Saudi-specific SaaS pricing, Tadawul broker partnerships, government/institutional licensing |
+
+### UC-8: Academic & Research
+
+| Attribute | Detail |
+|-----------|--------|
+| **User** | Universities, fintech bootcamps, research institutions |
+| **Problem** | Students and researchers lack access to real, production-grade fintech + AI + observability infrastructure for hands-on learning |
+| **Solution** | Open-source core for classroom use, educational API tier, pre-built Jupyter notebooks for financial ML experiments, complete observability stack (Prometheus + Loki + Grafana) as a teaching lab |
+| **Value** | Industry-ready skills from day one; publishable research using real market data pipelines |
+| **Revenue** | Academic licensing, freemium API tier, sponsored research partnerships |
+
+### Use Case Summary Matrix
+
+| # | Use Case | Primary Market | Key Metric | Pipeline |
+|---|----------|---------------|------------|----------|
+| UC-1 | Retail Trading | India, Saudi, US | Signal accuracy >60% | Prometheus |
+| UC-2 | Institutional Quant | Global | 1s resolution, PromQL | Prometheus |
+| UC-3 | Wealth Management | India, Saudi | 10 hrs/wk saved | Prometheus + Loki |
+| UC-4 | Fintech API | Global | <100ms API latency | Prometheus + Loki |
+| UC-5 | News Analytics | India, Saudi, Global | 20+ sources, <60s lag | Loki |
+| UC-6 | Compliance | India, Saudi, US | Zero-delay filing alerts | Loki |
+| UC-7 | Saudi Market | Saudi Arabia | Arabic-first AI | Prometheus + Loki |
+| UC-8 | Academic | Global | Open-source access | Prometheus + Loki |
+
+---
+
+## Who Will Buy This Software (SaaS)
+
+> **Business Model:** Open-source core with commercial SaaS offerings — inspired by
+> Grafana Labs (Grafana → Grafana Cloud), Elastic (Elasticsearch → Elastic Cloud),
+> and GitLab (CE → EE → SaaS) models.
+
+### SaaS Pricing Tiers
+
+| Tier | Price | Target | Includes |
+|------|-------|--------|----------|
+| **Free / Open Source** | $0 | Developers, students, hobbyists | Self-hosted, 5 stocks, 15-min delayed data, community support, basic Grafana dashboards |
+| **Starter** | $19/mo | Casual investors | 25 stocks, 1-minute data, email alerts, basic AI insights, single exchange |
+| **Pro** | $49/mo | Active traders | Unlimited stocks, real-time data (1s), PromQL alerts (Slack/SMS/Telegram), Maher AI chat, all 3 exchanges, news sentiment feed, priority support |
+| **Enterprise** | $499/mo | Firms, institutions, fintechs | Custom Prometheus/Grafana fork, multi-exchange, full API access, white-label, SLA (99.9%), dedicated support, SSO/RBAC, audit logging |
+| **API Developer** | Pay-per-use | Fintech builders | REST + WebSocket API, $0.001–$0.01/query, SDKs (Python, JS), usage dashboard, webhook subscriptions |
+
+### Target Buyer Segments
+
+#### Segment 1: Individual Traders (B2C)
+
+| Attribute | Detail |
+|-----------|--------|
+| **Who** | Day traders, swing traders, options traders |
+| **Geography** | India (NSE — 15M+ active traders), Saudi Arabia (Tadawul — 7M+ investors), US (IB/NYSE/NASDAQ) |
+| **Budget** | $19–$49/mo (currently spending $50–$300/mo on fragmented tools) |
+| **Decision Factor** | Signal accuracy, speed, ease of use, AI explanations in native language |
+| **Acquisition** | Social media (FinTwit, Reddit), influencer partnerships, YouTube finance channels, Arabic finance forums |
+| **Tier** | Starter / Pro |
+
+#### Segment 2: Registered Investment Advisors & Wealth Managers (B2B)
+
+| Attribute | Detail |
+|-----------|--------|
+| **Who** | RIAs (5–50 person firms), family offices, portfolio managers |
+| **Geography** | India, Saudi Arabia, UAE/GCC, US |
+| **Budget** | $499+/mo (enterprise tier) |
+| **Decision Factor** | Client-facing dashboards, compliance, reporting automation, white-label |
+| **Acquisition** | Industry conferences (Saudi Capital Market Forum, NSE events), B2B sales, advisor networks |
+| **Tier** | Enterprise |
+
+#### Segment 3: Hedge Funds & Proprietary Trading Firms (B2B)
+
+| Attribute | Detail |
+|-----------|--------|
+| **Who** | Quant teams, algo trading desks, prop shops |
+| **Geography** | Global (Singapore, London, New York, Mumbai, Riyadh) |
+| **Budget** | $2,000–$10,000+/mo (custom deployments) |
+| **Decision Factor** | 1s scrape resolution, custom Prometheus fork, PromQL programmability, low latency, self-hosted option |
+| **Acquisition** | Direct sales, quant community (QuantConnect, Zipline), fintech events, open-source reputation |
+| **Tier** | Enterprise + Custom |
+
+#### Segment 4: Fintech Companies (B2B / Platform)
+
+| Attribute | Detail |
+|-----------|--------|
+| **Who** | Trading apps, robo-advisors, neobrokers, wealth-tech startups |
+| **Geography** | Global — especially India (UPI/fintech boom) and Saudi (fintech sandbox / SAMA-licensed) |
+| **Budget** | Pay-per-use API ($500–$5,000/mo based on volume) |
+| **Decision Factor** | API reliability, documentation, latency, scalability, time-to-integrate |
+| **Acquisition** | Developer marketing, API marketplace listings, fintech accelerators, hackathons |
+| **Tier** | API Developer |
+
+#### Segment 5: Saudi Financial Institutions (B2B / Strategic)
+
+| Attribute | Detail |
+|-----------|--------|
+| **Who** | Saudi banks (Al Rajhi, SNB, Riyad Bank), Tadawul brokers, Saudi fund managers, CMA-licensed entities |
+| **Geography** | Saudi Arabia |
+| **Budget** | $5,000–$25,000+/mo (institutional licensing) |
+| **Decision Factor** | Arabic-first AI, Tadawul integration, CMA compliance, on-premise option, Vision 2030 alignment |
+| **Acquisition** | Monshaat connections, Saudi fintech events (Seamless KSA, LEAP), CMA sandbox, government partnerships |
+| **Tier** | Enterprise + Custom (on-premise / private cloud) |
+
+#### Segment 6: Media & Data Companies (B2B / Licensing)
+
+| Attribute | Detail |
+|-----------|--------|
+| **Who** | Financial publishers (Argaam, MoneyControl), data vendors, research firms |
+| **Geography** | India, Saudi Arabia, GCC |
+| **Budget** | $2,000–$10,000/mo (data licensing) |
+| **Decision Factor** | Sentiment data quality, NLP accuracy, source breadth, API reliability |
+| **Acquisition** | Partnership outreach, data marketplace listings, industry associations |
+| **Tier** | API Developer + Data License |
+
+#### Segment 7: Educational Institutions (B2B / Freemium)
+
+| Attribute | Detail |
+|-----------|--------|
+| **Who** | Universities (King Saud, IITs, KAUST), fintech bootcamps, research labs |
+| **Geography** | Saudi Arabia, India, Global |
+| **Budget** | Free – $500/mo (academic licensing) |
+| **Decision Factor** | Open-source access, documentation, educational content, research API |
+| **Acquisition** | Academic partnerships, open-source community, conference talks, student hackathons |
+| **Tier** | Free / Academic License |
+
+### Revenue Model
+
+| Stream | Description | Year 1 Target | Year 3 Target |
+|--------|-------------|---------------|---------------|
+| **SaaS Subscriptions** | Starter + Pro + Enterprise tiers | $120K ARR | $2.5M ARR |
+| **API Metering** | Pay-per-query for fintech developers | $30K | $800K |
+| **Data Licensing** | Sentiment, analytics, and market data feeds | $20K | $500K |
+| **Enterprise Contracts** | Custom deployments, white-label, SLAs | $50K | $1.5M |
+| **Marketplace Commission** | 15% on third-party plugins, dashboards, models | $0 | $200K |
+| **Total** | | **$220K ARR** | **$5.5M ARR** |
+
+### Market Sizing
+
+| Metric | Value | Basis |
+|--------|-------|-------|
+| **TAM** (Global Financial Analytics) | $45B by 2028 | Bloomberg, Refinitiv, FactSet, S&P — financial data & analytics market |
+| **SAM** (AI-Powered Retail + SME Trading Tools) | $4.2B | Subset: AI trading platforms, retail analytics, fintech APIs |
+| **SOM** (India + Saudi + US penetration) | $120M | 3% of SAM in year 5 — India (50%), Saudi (30%), US (20%) |
+| **Saudi Market Opportunity** | $850M | Saudi fintech market (SAMA-projected), growing at 30% CAGR |
+
+---
+
+## Entrepreneurship World Cup (EWC) 2026
+
+> **Competition:** [Entrepreneurship World Cup](https://entrepreneurshipworldcup.com/) — the world's
+> largest startup pitch competition, engaging 420,000+ entrepreneurs from 191 countries.
+> **Global Finals:** November 2026, Riyadh, Saudi Arabia.
+> **Prize Pool:** $1,000,000 in cash + $150M+ in-kind support.
+
+### Why Maher AI Should Apply to EWC 2026
+
+| Reason | Detail |
+|--------|--------|
+| **AI Sub-Track** | EWC 2026 has a dedicated **AI prize track** — Maher AI is an AI-first platform (LLM agents, NLP, PromQL generation, pattern recognition) |
+| **Saudi Home Advantage** | Finals in **Riyadh**. Maher AI has Tadawul integration, Arabic NLP, and Vision 2030 alignment — judges will see direct Saudi market relevance |
+| **Early Stage Fit** | EWC Early Track: functional product with early users, <$1M revenue — matches Maher AI's current development phase |
+| **Monshaat Partnership** | EWC is co-hosted by **Monshaat** (Saudi SME authority) — winning opens doors to Saudi government support and market entry |
+| **Global Exposure** | 420,000+ founder community, investor network, media coverage across 191 countries |
+| **Open Source + SaaS** | Unique model: open-source core (like Grafana Labs) with commercial SaaS — judges value scalable, defensible business models |
+
+### EWC Track Recommendation
+
+| Track | Fit | Rationale |
+|-------|-----|----------|
+| **AI Sub-Track** | Primary | Maher AI's core differentiator is AI — LLM-powered analysis, dynamic PromQL/LogQL generation, NLP sentiment (FinBERT + AraBERT), pattern recognition, autonomous trading signals |
+| **Early Stage** | Secondary | Product under active development (Phase 1), clear path to MVP, defined pricing tiers, no revenue yet — fits "functional product with early users" criteria |
+| **Idea Stage** | Fallback | If EWC categorizes Maher AI as pre-product, the Idea Track ($30K grand prize) remains viable |
+
+### EWC Judging Criteria → Maher AI Mapping
+
+> EWC selects based on: **Innovation, Scalability, and Impact.**
+
+| EWC Criterion | Maher AI Evidence | Score Strength |
+|---------------|-------------------|----------------|
+| **Innovation** | Only platform combining custom Prometheus fork (1s scraping) + Loki + custom Grafana for financial data. QuantOps = DevOps observability concepts applied to capital markets — a new category. Arabic-first AI (AraBERT) for MENA fintech — no competitor offers this. | Very Strong |
+| **Scalability** | Cloud-native K8s architecture. SaaS model with 5 pricing tiers. API platform for B2B scale. Multi-exchange (India + Saudi + US) from day one. Marketplace for third-party plugins. TAM: $45B financial analytics market. | Very Strong |
+| **Impact** | Democratizes institutional-grade financial intelligence for retail traders. Aligns with Saudi Vision 2030 (FSDP, SDAIA, NTP pillars). Arabic NLP fills a critical MENA fintech gap. Open-source core benefits the global developer community. | Very Strong |
+| **Team & Execution** | Active development (April 2026), 10-phase execution plan with detailed task breakdowns, ADR-driven architecture, open-source contribution model. | Strong |
+| **Business Model** | Open-core SaaS (proven model: Grafana Labs, GitLab, Elastic). Revenue projections: $220K ARR Year 1 → $5.5M ARR Year 3. Multiple revenue streams: subscriptions, API, licensing, marketplace. | Strong |
+| **Market Opportunity** | Saudi fintech growing 30% CAGR ($850M). India: 15M+ active traders. Global financial analytics: $45B by 2028. No Arabic-first AI competitor in the market. | Very Strong |
+
+### EWC 2026 Timeline × Maher AI Development
+
+```
+EWC Timeline              Maher AI Phase         Deliverable for EWC
+─────────────────────────────────────────────────────────────────────────────
+Nov 2025 – May 2026       Phase 1–2              Submit application with
+  Applications Open                               stock exporter demo,
+                                                   Prometheus integration,
+                                                   metrics schema
+
+July 2026                 Phase 3                 Custom Prometheus fork
+  EWC Selection                                    (1s scraping) — live demo
+                                                   of real-time stock data
+
+August 2026               Phase 4–5              PromQL alerts + Grafana
+  Virtual Bootcamp                                 dashboards — investor-ready
+  (Top 250)                                        pitch deck + demo
+
+September 2026            Phase 5–6              Central UI prototype,
+  EWC 100 Selection                                Grafana financial panels,
+                                                   cross-exchange dashboard
+
+November 2026             Phase 6–7              Central UI + Maher AI
+  Global Finals                                    chat demo — live on stage
+  (Riyadh)                                         in Riyadh with Tadawul
+                                                   data + Arabic AI
+```
+
+### Pitch Narrative for EWC
+
+**One-Liner:**
+> "Maher AI is the Bloomberg Terminal for everyone — powered by observability infrastructure and AI agents."
+
+**Elevator Pitch (30 seconds):**
+> Financial markets generate terabytes of data daily — prices, news, filings, social sentiment —
+> but retail traders and small firms are locked out of institutional-grade analytics.
+> Maher AI uses Prometheus for real-time market metrics, Loki for news intelligence,
+> and AI agents for natural-language trading insights — all in a single platform.
+> We're open-source at the core with SaaS monetization, starting with India, Saudi Arabia, and US markets.
+> Our Arabic-first AI makes us the only platform purpose-built for MENA capital markets.
+
+**Key Demo Highlights for Judges:**
+
+| Demo Moment | What Judges See | Wow Factor |
+|-------------|----------------|------------|
+| 1. Live stock data | Prometheus metrics at 1-second resolution from NSE + Tadawul | "They built a custom Prometheus fork for stocks" |
+| 2. PromQL alert fires | Real-time alert: "ARAMCO volume spike 3x average" → SMS notification | "Programmable financial alerts using cloud-native tools" |
+| 3. Grafana dashboard | Custom candlestick + order book panels showing live Tadawul data | "This looks like a Bloomberg terminal" |
+| 4. Maher AI chat | Ask in Arabic: "ماذا تقول عن أرامكو اليوم؟" → AI responds with analysis | "Arabic AI for Saudi markets — no one else does this" |
+| 5. News sentiment | Loki-powered news feed: sentiment gauge flips negative → price chart drops | "They connected news to prices in real-time" |
+
+### Benefits of EWC Participation
+
+| Benefit | Detail |
+|---------|--------|
+| **Cash Prize** | Up to **$200,000** (Early Stage Grand Prize) or AI Sub-Track prize |
+| **Investor Network** | Direct introductions to VCs, angels, and institutional investors at Global Finals |
+| **Saudi Market Entry** | Monshaat (co-host) partnership → government-backed market-entry support, startup visa, office space |
+| **Mentorship** | Virtual Bootcamp (Top 250): pitch training, investor readiness, business model refinement from global mentors |
+| **Media Exposure** | Global press coverage across 191 countries; social media amplification through EWC channels |
+| **Founder Network** | Lifetime access to 420,000+ entrepreneur community and VIP access to future innovation events |
+| **Saudi Partnerships** | Doors to Saudi financial institutions, Tadawul, CMA sandbox, SAMA fintech licensing |
+| **Validation** | EWC selection = third-party validation for future fundraising, customer acquisition, and hiring |
+
+### Key Differentiators for EWC Judges
+
+```
+┌──────────────────────────────────────────────────────────────────────────────┐
+│                    WHY MAHER AI WINS AT EWC 2026                            │
+├──────────────────────────────────────────────────────────────────────────────┤
+│                                                                              │
+│  1. CATEGORY CREATOR                                                         │
+│     "QuantOps" = DevOps observability for capital markets                    │
+│     No one else uses Prometheus + Loki for financial data                    │
+│                                                                              │
+│  2. DUAL PIPELINE ARCHITECTURE                                               │
+│     Market Data ──→ Prometheus ──→ AI ──→ Insights                           │
+│     News Data   ──→ Loki       ──→ AI ──→ Decisions                          │
+│     Both pipelines feed ONE unified AI agent (Maher)                         │
+│                                                                              │
+│  3. ARABIC-FIRST AI FOR MENA                                                 │
+│     AraBERT for Saudi financial news                                         │
+│     Arabic Maher AI chat persona                                             │
+│     Tadawul-native integration                                               │
+│     Zero competitors in Arabic fintech AI                                    │
+│                                                                              │
+│  4. OPEN-SOURCE + SAAS (PROVEN MODEL)                                        │
+│     Grafana Labs: Open-source Grafana → $1B+ revenue via Grafana Cloud       │
+│     Elastic: Open Elasticsearch → $1B+ revenue via Elastic Cloud             │
+│     Maher AI: Open QuantOps → SaaS + API + Enterprise                        │
+│                                                                              │
+│  5. VISION 2030 ALIGNMENT                                                    │
+│     FSDP (Financial Sector Development Program)                              │
+│     SDAIA (Saudi Data & AI Authority)                                        │
+│     NTP (National Transformation Program)                                    │
+│     Built for Saudi Arabia, expandable worldwide                             │
+│                                                                              │
+└──────────────────────────────────────────────────────────────────────────────┘
+```
+
+### EWC Application Checklist
+
+| # | Item | Status | Notes |
+|---|------|--------|-------|
+| 1 | Register at [entrepreneurshipworldcup.com/apply-form](https://entrepreneurshipworldcup.com/apply-form/) | ⬜ | Applications open Nov 2025 – May 2026 |
+| 2 | Select track: AI Sub-Track (primary) + Early Stage | ⬜ | Dual-track if allowed; otherwise AI Sub-Track |
+| 3 | Prepare pitch deck (10 slides) | ⬜ | Problem, Solution, Demo, Market, Business Model, Traction, Team, Vision 2030, Ask |
+| 4 | Record 3-minute pitch video | ⬜ | Live demo of Prometheus + Grafana + Maher AI chat |
+| 5 | Prepare financial projections | ⬜ | $220K ARR Y1 → $5.5M ARR Y3, unit economics |
+| 6 | Gather supporting documents | ⬜ | Incorporation docs, ID, GitHub repo stats, any LOIs |
+| 7 | Build demo environment | ⬜ | Live: NSE + Tadawul data → Prometheus → Grafana → AI |
+| 8 | Arabic AI demo ready | ⬜ | Maher AI responding in Arabic about Tadawul stocks |
+| 9 | Vision 2030 alignment doc | ⬜ | Reference [Saudi2030.md](Saudi2030.md) |
+| 10 | Submit before deadline | ⬜ | Target: May 2026 |
 
 ---
 
