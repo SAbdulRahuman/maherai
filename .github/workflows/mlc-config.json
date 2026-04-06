@@ -5,7 +5,21 @@
     },
     {
       "pattern": "^https://www.vision2030.gov.sa"
+    },
+    {
+      "pattern": "^(\\.\\./)+(issues|discussions|labels)"
+    },
+    {
+      "pattern": "^http://localhost"
+    },
+    {
+      "pattern": "https://(sdaia\\.gov\\.sa|cma\\.org\\.sa)"
     }
   ],
-  "aliveStatusCodes": [200, 206, 301, 302, 403]
+  "aliveStatusCodes": [200, 206, 301, 302, 403],
+  "retryOn429": true,
+  "retryCount": 2,
+  "fallbackRetryDelay": 5000,
+  "timeout": 15000,
+  "concurrency": 2
 }
