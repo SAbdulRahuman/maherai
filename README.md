@@ -2,7 +2,7 @@
 
 # Maher AI — QuantOps
 
-<!-- ### ماهر • The AI-Powered Financial Expert
+### ماهر • The AI-Powered Financial Expert
 
 [![Status](https://img.shields.io/badge/Status-Phase%201%20%E2%80%93%20MVP-blue?style=flat-square)](#project-status)
 [![License](https://img.shields.io/badge/License-Apache%202.0-green?style=flat-square)](LICENSE)
@@ -18,11 +18,11 @@
 [Roadmap](#roadmap) •
 [Contributing](#contributing)
 
-</div> -->
+</div>
 
 ---
 
-<!-- ## About -->
+## About
 
 **Maher AI — QuantOps** is a real-time financial intelligence platform that combines market data,
 news signals, and AI agents to generate actionable insights for traders, investors,
