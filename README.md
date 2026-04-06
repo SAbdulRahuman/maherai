@@ -48,7 +48,7 @@ Market Data ──→ Prometheus ──→ Grafana ──→ AI Agents (Maher) �
 News Data   ──→ Loki       ──→ Grafana ──→ AI Agents (Maher) ──→ Decisions
 ```
 
-## Key Features
+<!-- ## Key Features
 
 | Feature | Description |
 |---------|-------------|
@@ -57,9 +57,9 @@ News Data   ──→ Loki       ──→ Grafana ──→ AI Agents (Maher) �
 | **News + Sentiment Analysis** | Real-time news ingestion, sentiment scoring, market impact prediction |
 | **Smart Alerts** | Price movement, volume anomaly, and news-triggered alerts |
 | **API Platform** | Developer APIs, fintech integrations, data-as-a-service |
-| **Explainable AI** | Every recommendation includes a natural language rationale via Maher persona |
+| **Explainable AI** | Every recommendation includes a natural language rationale via Maher persona | -->
 
-## Tech Stack
+<!-- ## Tech Stack
 
 | Layer | Technologies |
 |-------|-------------|
@@ -278,4 +278,4 @@ This project is licensed under the [Apache License 2.0](LICENSE).
 [Contributing](.github/CONTRIBUTING.md) •
 [Vision 2030](Saudi2030.md)
 
-</div>
+</div> -->
