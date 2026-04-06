@@ -6,7 +6,7 @@
 
 [![Status](https://img.shields.io/badge/Status-Phase%201%20%E2%80%93%20MVP-blue?style=flat-square)](#project-status)
 [![License](https://img.shields.io/badge/License-Apache%202.0-green?style=flat-square)](LICENSE)
-[![Vision 2030](https://img.shields.io/badge/Saudi%20Vision-2030-00843D?style=flat-square)](Saudi2030.md)
+<!-- [![Vision 2030](https://img.shields.io/badge/Saudi%20Vision-2030-00843D?style=flat-square)](Saudi2030.md) -->
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen?style=flat-square)](.github/CONTRIBUTING.md)
 [![CI](https://img.shields.io/badge/CI-passing-brightgreen?style=flat-square)](.github/workflows/ci.yml)
 
@@ -29,8 +29,8 @@ news signals, and AI agents to generate actionable insights for traders, investo
 and financial institutions. It transforms fragmented financial data into clear,
 decision-ready intelligence — delivered through the **Maher** (ماهر — _expert_) AI persona.
 
-Aligned with [Saudi Vision 2030](Saudi2030.md), the platform contributes to the Kingdom's
-digital transformation and financial sector modernization goals.
+<!-- Aligned with [Saudi Vision 2030](Saudi2030.md), the platform contributes to the Kingdom's
+digital transformation and financial sector modernization goals. -->
 
 ### The Problem
 
