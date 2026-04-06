@@ -1,0 +1,56 @@
+title: "Technical RFC"
+labels: ["rfc", "architecture"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ## Technical RFC (Request for Comments)
+        Propose a technical approach for discussion before implementation.
+
+  - type: input
+    id: rfc_title
+    attributes:
+      label: "RFC Title"
+      placeholder: "e.g., Event Streaming Architecture for Real-Time Market Data Pipeline"
+    validations:
+      required: true
+
+  - type: textarea
+    id: summary
+    attributes:
+      label: "Summary"
+      description: "One-paragraph summary of the proposal."
+    validations:
+      required: true
+
+  - type: textarea
+    id: motivation
+    attributes:
+      label: "Motivation"
+      description: "Why is this needed? What problem does it solve?"
+    validations:
+      required: true
+
+  - type: textarea
+    id: detailed_design
+    attributes:
+      label: "Detailed Design"
+      description: "Technical details, diagrams, and implementation approach."
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: "Alternatives Considered"
+      description: "Other approaches and why they were not chosen."
+    validations:
+      required: false
+
+  - type: textarea
+    id: open_questions
+    attributes:
+      label: "Open Questions"
+      description: "Questions you'd like the community to weigh in on."
+    validations:
+      required: false

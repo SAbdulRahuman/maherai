@@ -1,0 +1,107 @@
+name: "\U0001F3D7 Architecture Decision Record (ADR)"
+description: "Propose or document a significant architecture decision."
+title: "[ADR] "
+labels: ["architecture", "adr"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ## Architecture Decision Record
+        Use this template to propose or document a key architectural decision.
+        Follow the format: Context → Decision → Consequences.
+
+  - type: input
+    id: adr_title
+    attributes:
+      label: "Decision Title"
+      description: "A short, descriptive title for this architecture decision."
+      placeholder: "e.g., Use Prometheus for market data time-series metrics"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: adr_status
+    attributes:
+      label: "Status"
+      options:
+        - "Proposed"
+        - "Accepted"
+        - "Deprecated"
+        - "Superseded"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: adr_category
+    attributes:
+      label: "Category"
+      options:
+        - "System Architecture"
+        - "Data Ingestion & Streaming"
+        - "Observability (Prometheus / Grafana / Loki)"
+        - "AI / ML Pipeline (Maher Engine)"
+        - "API Design & Integration"
+        - "Security & Compliance"
+        - "Infrastructure & Kubernetes"
+        - "Frontend / Dashboard"
+        - "Technology Selection"
+        - "Performance & Scalability"
+    validations:
+      required: true
+
+  - type: textarea
+    id: context
+    attributes:
+      label: "Context"
+      description: "What is the situation that requires this decision? What forces are at play?"
+      placeholder: |
+        Describe the technical and business context.
+        What constraints, requirements, or forces led to this decision?
+    validations:
+      required: true
+
+  - type: textarea
+    id: options_considered
+    attributes:
+      label: "Options Considered"
+      description: "List the alternatives evaluated."
+      placeholder: |
+        ### Option A: ...
+        - Pros: ...
+        - Cons: ...
+
+        ### Option B: ...
+        - Pros: ...
+        - Cons: ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: decision
+    attributes:
+      label: "Decision"
+      description: "What is the decision and why was it chosen?"
+      placeholder: |
+        We will adopt Option X because ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: consequences
+    attributes:
+      label: "Consequences"
+      description: "What are the positive, negative, and neutral consequences?"
+      placeholder: |
+        **Positive:** ...
+        **Negative:** ...
+        **Risks:** ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: related_adrs
+    attributes:
+      label: "Related Decisions"
+      description: "Link to related ADRs or architecture discussions."
+    validations:
+      required: false

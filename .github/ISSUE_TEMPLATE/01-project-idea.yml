@@ -1,0 +1,136 @@
+name: "\U0001F4A1 Feature / Module Idea"
+description: "Propose a new feature or module idea for Maher AI - QuantOps."
+title: "[IDEA] "
+labels: ["idea", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ## Maher AI - QuantOps — Feature / Module Idea
+        Thank you for contributing an idea! Please fill out the sections below 
+        so the team can evaluate fit within the Maher AI - QuantOps platform.
+
+  - type: input
+    id: idea_title
+    attributes:
+      label: "Idea Title"
+      description: "A concise, descriptive name for the idea."
+      placeholder: "e.g., Crypto Market Data Ingestion Pipeline"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: platform_layer
+    attributes:
+      label: "Platform Layer"
+      description: "Which Maher AI - QuantOps layer does this idea primarily target?"
+      options:
+        - "Data Ingestion Layer"
+        - "Storage & Streaming Layer"
+        - "Observability Layer (Prometheus / Grafana / Loki)"
+        - "AI Processing Layer (Maher Engine)"
+        - "API Platform Layer"
+        - "Frontend Dashboard"
+        - "Infrastructure & DevOps"
+        - "Cross-cutting / Platform-wide"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: domain
+    attributes:
+      label: "Domain"
+      description: "Which functional domain does this idea belong to?"
+      options:
+        - "Real-Time Market Intelligence"
+        - "AI Decision Engine (Maher)"
+        - "News & Sentiment Analysis"
+        - "Smart Alerts & Notifications"
+        - "API & Data-as-a-Service"
+        - "User Management & Auth"
+        - "Analytics & Reporting"
+        - "Infrastructure & Scalability"
+        - "Other"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: target_market
+    attributes:
+      label: "Target Market Segment"
+      description: "Which user segment benefits most?"
+      options:
+        - "Retail Traders & Individual Investors"
+        - "Fintech Startups & Trading Platforms"
+        - "Hedge Funds & Financial Institutions"
+        - "All Segments"
+    validations:
+      required: true
+
+  - type: textarea
+    id: problem_statement
+    attributes:
+      label: "Problem Statement"
+      description: "What problem does this idea solve? Who is affected?"
+      placeholder: |
+        Describe the current pain point or gap in Maher AI - QuantOps.
+        Who are the primary users impacted?
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposed_solution
+    attributes:
+      label: "Proposed Solution"
+      description: "High-level description of what this feature/module will deliver."
+      placeholder: |
+        Describe the solution at a high level.
+        What are the key capabilities?
+        How does it fit into the Market Data → Maher AI → Insights flow?
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected_impact
+    attributes:
+      label: "Expected Impact & KPIs"
+      description: "How will success be measured?"
+      placeholder: |
+        - KPI 1: Latency of insight delivery < Xms
+        - KPI 2: Accuracy of Maher AI recommendations > X%
+        - KPI 3: Number of new API consumers
+    validations:
+      required: true
+
+  - type: textarea
+    id: target_users
+    attributes:
+      label: "Target Users / Personas"
+      description: "Who will use this feature?"
+      placeholder: |
+        - Persona 1: Retail day trader
+        - Persona 2: Fintech platform developer
+        - Persona 3: Portfolio manager
+    validations:
+      required: false
+
+  - type: dropdown
+    id: priority
+    attributes:
+      label: "Suggested Priority"
+      options:
+        - "Critical - Core platform capability"
+        - "High - Strategic differentiator"
+        - "Medium - Valuable enhancement"
+        - "Low - Nice to have / exploratory"
+    validations:
+      required: false
+
+  - type: textarea
+    id: additional_context
+    attributes:
+      label: "Additional Context"
+      description: "Any references, links, benchmarks, or inspiration."
+      placeholder: "Links to competitor products, APIs, research papers, etc."
+    validations:
+      required: false

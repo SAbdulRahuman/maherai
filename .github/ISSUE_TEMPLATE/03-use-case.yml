@@ -1,0 +1,125 @@
+name: "\U0001F4CB Use Case Definition"
+description: "Define a business or system use case."
+title: "[USE-CASE] "
+labels: ["use-case", "requirements"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ## Use Case Definition
+        Document a use case following standard UML/business analysis format.
+
+  - type: input
+    id: uc_id
+    attributes:
+      label: "Use Case ID"
+      description: "A unique identifier for tracking."
+      placeholder: "e.g., UC-001"
+    validations:
+      required: true
+
+  - type: input
+    id: uc_title
+    attributes:
+      label: "Use Case Title"
+      description: "A short descriptive name."
+      placeholder: "e.g., Trader receives AI buy/sell recommendation"
+    validations:
+      required: true
+
+  - type: textarea
+    id: actors
+    attributes:
+      label: "Actors"
+      description: "Who are the primary and secondary actors?"
+      placeholder: |
+        **Primary Actor:** Retail Trader
+        **Secondary Actors:** AI Decision Engine, Market Data Service, Alert Service
+    validations:
+      required: true
+
+  - type: textarea
+    id: preconditions
+    attributes:
+      label: "Preconditions"
+      description: "What must be true before this use case begins?"
+      placeholder: |
+        - User is authenticated
+        - Market data feed is active
+        - AI agents are running
+    validations:
+      required: true
+
+  - type: textarea
+    id: main_flow
+    attributes:
+      label: "Main Flow (Happy Path)"
+      description: "Step-by-step description of the normal flow."
+      placeholder: |
+        1. Trader opens the Maher AI dashboard
+        2. System displays real-time stock prices and charts
+        3. AI engine detects a buy signal based on market + sentiment data
+        4. Maher AI generates a recommendation with confidence score
+        5. Trader reviews the natural language explanation from Maher
+        6. System logs the recommendation and sends alert
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternative_flows
+    attributes:
+      label: "Alternative Flows"
+      description: "Variations from the main flow."
+      placeholder: |
+        **3a.** Market data feed is delayed
+          - System shows last known data with staleness indicator
+    validations:
+      required: false
+
+  - type: textarea
+    id: exception_flows
+    attributes:
+      label: "Exception Flows"
+      description: "Error conditions and how they are handled."
+      placeholder: |
+        **3a.** Maher AI model fails to generate recommendation
+          - System falls back to rule-based signals and notifies ops team
+    validations:
+      required: false
+
+  - type: textarea
+    id: postconditions
+    attributes:
+      label: "Postconditions"
+      description: "What is true after the use case completes successfully?"
+      placeholder: |
+        - Recommendation is stored in the system with timestamp
+        - Trader can view recommendation history
+        - Alert is sent via configured channels
+    validations:
+      required: true
+
+  - type: textarea
+    id: business_rules
+    attributes:
+      label: "Business Rules & Constraints"
+      description: "Any rules that govern this use case."
+      placeholder: |
+        - BR-01: Recommendations must include confidence score > 60%
+        - BR-02: Real-time data must not be older than 5 seconds
+        - BR-03: AI decisions must be explainable (no black-box)
+    validations:
+      required: false
+
+  - type: textarea
+    id: nonfunctional
+    attributes:
+      label: "Non-Functional Requirements"
+      description: "Performance, security, accessibility, or other quality attributes."
+      placeholder: |
+        - Recommendation latency < 500ms from signal detection
+        - Dashboard P95 load time < 2 seconds
+        - Support 10,000+ concurrent WebSocket connections
+        - API rate limiting per subscription tier
+    validations:
+      required: false

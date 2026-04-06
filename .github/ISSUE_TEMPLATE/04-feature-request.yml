@@ -1,0 +1,90 @@
+name: "\U0001F680 Feature Request"
+description: "Request a new feature or enhancement."
+title: "[FEATURE] "
+labels: ["feature", "enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ## Feature Request
+        Describe a new feature or enhancement for the platform.
+
+  - type: input
+    id: feature_title
+    attributes:
+      label: "Feature Title"
+      placeholder: "e.g., Volume anomaly detection alert"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: feature_type
+    attributes:
+      label: "Feature Type"
+      options:
+        - "New Capability"
+        - "Enhancement of Existing Feature"
+        - "Data Source Integration"
+        - "AI / ML Model"
+        - "API Endpoint"
+        - "Dashboard / Visualization"
+        - "Alert / Notification"
+        - "Infrastructure / DevOps"
+        - "Performance Improvement"
+        - "Developer Experience"
+    validations:
+      required: true
+
+  - type: textarea
+    id: user_story
+    attributes:
+      label: "User Story"
+      description: "As a [persona], I want [goal] so that [benefit]."
+      placeholder: |
+        As a **retail trader**, 
+        I want to **receive real-time alerts when unusual volume is detected**
+        so that I can **react quickly to potential market-moving events**.
+    validations:
+      required: true
+
+  - type: textarea
+    id: acceptance_criteria
+    attributes:
+      label: "Acceptance Criteria"
+      description: "Conditions that must be met for this feature to be considered complete."
+      placeholder: |
+        - [ ] Alert triggers when volume exceeds 3x average
+        - [ ] User can configure threshold per stock
+        - [ ] Alert includes Maher AI-generated explanation
+        - [ ] Delivered via dashboard, email, and webhook
+    validations:
+      required: true
+
+  - type: textarea
+    id: mockups
+    attributes:
+      label: "Mockups / Wireframes"
+      description: "Attach or describe any visual references."
+      placeholder: "Drag and drop images or describe the expected UI."
+    validations:
+      required: false
+
+  - type: dropdown
+    id: priority
+    attributes:
+      label: "Priority"
+      options:
+        - "P0 - Critical"
+        - "P1 - High"
+        - "P2 - Medium"
+        - "P3 - Low"
+    validations:
+      required: false
+
+  - type: textarea
+    id: dependencies
+    attributes:
+      label: "Dependencies"
+      description: "Other features, services, or decisions this depends on."
+    validations:
+      required: false

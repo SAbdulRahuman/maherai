@@ -1,0 +1,52 @@
+title: "Brainstorming"
+labels: ["brainstorm"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ## Maher AI - QuantOps — Brainstorming Session
+        Share ideas openly. All ideas related to financial intelligence,
+        AI-driven trading, market data, and observability are welcome.
+        
+        "Maher" (ماهر) means expert — help us build the AI financial expert.
+
+  - type: input
+    id: topic
+    attributes:
+      label: "Topic"
+      placeholder: "What area or problem are you brainstorming about?"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: domain
+    attributes:
+      label: "Domain"
+      options:
+        - "Market Data & Ingestion"
+        - "AI / Maher Agent & Decision Engine"
+        - "News & Sentiment Analysis"
+        - "Observability (Prometheus / Grafana / Loki)"
+        - "Alerts & Notifications"
+        - "API Platform & Integrations"
+        - "Infrastructure & Kubernetes"
+        - "Business Model & Monetization"
+        - "Cross-cutting / General"
+    validations:
+      required: true
+
+  - type: textarea
+    id: ideas
+    attributes:
+      label: "Ideas & Thoughts"
+      description: "Share your ideas freely. Bullet points, sketches, links — all welcome."
+    validations:
+      required: true
+
+  - type: textarea
+    id: references
+    attributes:
+      label: "References & Inspiration"
+      description: "Any links, competitor analysis, APIs, or examples that inspired these ideas."
+    validations:
+      required: false

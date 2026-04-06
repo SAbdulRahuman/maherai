@@ -1,0 +1,57 @@
+# Docs & Issue Validation
+name: Validate
+
+on:
+  pull_request:
+    branches: [main, develop]
+  issues:
+    types: [opened, edited]
+
+jobs:
+  validate-docs:
+    name: Validate Documentation
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check for broken links in Markdown
+        uses: gaurav-nelson/github-action-markdown-link-check@v1
+        with:
+          use-quiet-mode: 'yes'
+          config-file: '.github/workflows/mlc-config.json'
+
+  label-issues:
+    name: Auto-label Issues
+    runs-on: ubuntu-latest
+    if: github.event_name == 'issues'
+    permissions:
+      issues: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Label by template type
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const title = context.payload.issue.title;
+            const labels = [];
+            
+            if (title.startsWith('[IDEA]')) labels.push('idea', 'triage');
+            if (title.startsWith('[ADR]')) labels.push('architecture', 'adr');
+            if (title.startsWith('[USE-CASE]')) labels.push('use-case', 'requirements');
+            if (title.startsWith('[FEATURE]')) labels.push('feature', 'enhancement');
+            if (title.startsWith('[ROADMAP]')) labels.push('roadmap', 'milestone');
+            if (title.startsWith('[BUG]')) labels.push('bug');
+            if (title.startsWith('[AI]')) labels.push('ai', 'ml');
+            if (title.startsWith('[DATA]')) labels.push('data-pipeline');
+            if (title.startsWith('[INFRA]')) labels.push('infrastructure', 'kubernetes');
+            
+            if (labels.length > 0) {
+              await github.rest.issues.addLabels({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                labels: labels
+              });
+            }

@@ -1,0 +1,36 @@
+# Project Board Automation
+name: Project Automation
+
+on:
+  issues:
+    types: [opened, closed, reopened]
+  pull_request:
+    types: [opened, closed, reopened, ready_for_review]
+
+jobs:
+  welcome:
+    name: Welcome New Contributors
+    runs-on: ubuntu-latest
+    if: github.event_name == 'issues' && github.event.action == 'opened'
+    permissions:
+      issues: write
+    steps:
+      - uses: actions/github-script@v7
+        with:
+          script: |
+            const author = context.payload.issue.user.login;
+            const issues = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              creator: author,
+              state: 'all'
+            });
+            
+            if (issues.data.length === 1) {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body: `Welcome @${author}! \uD83D\uDC4B Thank you for your first contribution to **Maher AI - QuantOps**.\n\nPlease make sure to:\n- Review our [Contributing Guide](/.github/CONTRIBUTING.md)\n- Check the [Architecture Overview](/docs/architecture/README.md)\n- Join our [Discussions](../../discussions) for brainstorming\n\nA maintainer will review your issue soon.`
+              });
+            }

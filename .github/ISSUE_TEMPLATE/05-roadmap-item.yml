@@ -1,0 +1,97 @@
+name: "\U0001F5FA Roadmap Item"
+description: "Define a milestone or roadmap deliverable."
+title: "[ROADMAP] "
+labels: ["roadmap", "milestone"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ## Roadmap Item
+        Define a key deliverable or milestone for the project roadmap.
+
+  - type: input
+    id: milestone_title
+    attributes:
+      label: "Milestone Title"
+      placeholder: "e.g., MVP - Real-Time Stock Dashboard + Maher AI Insights v1"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: phase
+    attributes:
+      label: "Roadmap Phase"
+      options:
+        - "Phase 1 - MVP Dashboard & Basic AI (0-30 days)"
+        - "Phase 2 - AI Agents, News & Alerts (30-60 days)"
+        - "Phase 3 - Multi-user, API Platform & Cloud (60-90 days)"
+        - "Phase 4 - Mobile, Advanced Analytics & Enterprise (90+ days)"
+        - "Future - Crypto, Forex & Autonomous Trading"
+    validations:
+      required: true
+
+  - type: input
+    id: target_date
+    attributes:
+      label: "Target Completion Date"
+      description: "Estimated delivery date (YYYY-MM-DD or quarter)."
+      placeholder: "e.g., 2026-Q3"
+    validations:
+      required: false
+
+  - type: textarea
+    id: objectives
+    attributes:
+      label: "Objectives"
+      description: "What this milestone aims to achieve."
+      placeholder: |
+        - Objective 1: Live stock tracking dashboard
+        - Objective 2: Basic AI buy/sell signals for NSE
+    validations:
+      required: true
+
+  - type: textarea
+    id: deliverables
+    attributes:
+      label: "Key Deliverables"
+      description: "Concrete outputs expected at this milestone."
+      placeholder: |
+        - [ ] NSE market data ingestion pipeline
+        - [ ] Prometheus metrics collection
+        - [ ] Grafana dashboard with live charts
+        - [ ] Maher AI agent v1 for buy/sell recommendations
+        - [ ] Kubernetes deployment manifests
+    validations:
+      required: true
+
+  - type: textarea
+    id: success_criteria
+    attributes:
+      label: "Success Criteria"
+      description: "How will we know this milestone is complete?"
+      placeholder: |
+        - All deliverables pass QA
+        - Performance benchmarks met
+        - Stakeholder sign-off obtained
+    validations:
+      required: true
+
+  - type: textarea
+    id: risks
+    attributes:
+      label: "Risks & Mitigations"
+      description: "Potential risks and proposed mitigations."
+      placeholder: |
+        | Risk | Impact | Mitigation |
+        |------|--------|------------|
+        | Resource constraints | High | Phased hiring plan |
+    validations:
+      required: false
+
+  - type: textarea
+    id: dependencies
+    attributes:
+      label: "Dependencies"
+      description: "Other milestones, teams, or external factors this depends on."
+    validations:
+      required: false
