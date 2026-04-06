@@ -1,0 +1,37 @@
+# Code Owners — Maher AI — QuantOps
+# These owners will be automatically requested for review on PRs
+
+# Default: Core team reviews everything
+* @seenimoa
+
+# Architecture & Design
+docs/architecture/ @seenimoa
+docs/design/ @seenimoa
+.github/ISSUE_TEMPLATE/02-architecture-decision.yml @seenimoa
+
+# AI Engine
+src/ai/ @seenimoa
+
+# Market Data Ingestion
+src/ingestion/ @seenimoa
+
+# API
+src/api/ @seenimoa
+docs/api/ @seenimoa
+
+# Frontend Dashboard
+src/dashboard/ @seenimoa
+
+# Infrastructure & DevOps
+src/infra/ @seenimoa
+.github/workflows/ @seenimoa
+docker-compose.yml @seenimoa
+
+# Documentation
+docs/ @seenimoa
+README.md @seenimoa
+Saudi2030.md @seenimoa
+
+# Security-sensitive files
+.github/SECURITY.md @seenimoa
+src/api/middleware/ @seenimoa

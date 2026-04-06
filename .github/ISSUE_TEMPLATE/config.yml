@@ -1,5 +1,11 @@
 blank_issues_enabled: true
 contact_links:
   - name: "\U0001F4AC Discussions - Brainstorming"
-    url: https://github.com/seenimoa/abdul-saudi2030/discussions
-    about: "Use Discussions for open-ended brainstorming, Q&A, and feature ideas for Maher AI - QuantOps."
+    url: https://github.com/seenimoa/maherai/discussions
+    about: "Use Discussions for open-ended brainstorming, Q&A, and feature ideas for Maher AI — QuantOps."
+  - name: "📖 Documentation"
+    url: https://github.com/seenimoa/maherai/tree/main/docs
+    about: "Browse project documentation including architecture, API design, and development guide."
+  - name: "🗺 Roadmap"
+    url: https://github.com/seenimoa/maherai/tree/main/docs/roadmap
+    about: "View the project roadmap and delivery milestones."

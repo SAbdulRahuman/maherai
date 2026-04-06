@@ -1,0 +1,162 @@
+# CI Pipeline — Maher AI — QuantOps
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  PYTHON_VERSION: "3.11"
+  NODE_VERSION: "20"
+
+jobs:
+  # ─── Lint ────────────────────────────────────────────────
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install Python linters
+        run: pip install ruff black mypy isort
+
+      - name: Run ruff (Python linting)
+        run: ruff check . --output-format=github
+        continue-on-error: true
+
+      - name: Run black (Python formatting check)
+        run: black --check .
+        continue-on-error: true
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Validate Markdown links
+        uses: gaurav-nelson/github-action-markdown-link-check@v1
+        with:
+          use-quiet-mode: "yes"
+          config-file: ".github/workflows/mlc-config.json"
+
+  # ─── Test (Python) ──────────────────────────────────────
+  test-python:
+    name: Test (Python)
+    runs-on: ubuntu-latest
+    needs: lint
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+          if [ -f requirements-dev.txt ]; then pip install -r requirements-dev.txt; fi
+          pip install pytest pytest-cov
+
+      - name: Run tests
+        run: |
+          if [ -d tests/ ]; then
+            pytest tests/ -v --cov --cov-report=xml --junitxml=test-results.xml
+          else
+            echo "No tests directory found — skipping"
+          fi
+
+      - name: Upload coverage
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: coverage.xml
+          retention-days: 7
+
+  # ─── Test (Node.js) ─────────────────────────────────────
+  test-node:
+    name: Test (Node.js)
+    runs-on: ubuntu-latest
+    needs: lint
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Install and test dashboard
+        run: |
+          if [ -f src/dashboard/package.json ]; then
+            cd src/dashboard
+            npm ci
+            npm run lint || true
+            npm test || true
+          else
+            echo "No dashboard package.json found — skipping"
+          fi
+
+  # ─── Build Docker Images ────────────────────────────────
+  build:
+    name: Build Docker Images
+    runs-on: ubuntu-latest
+    needs: [test-python, test-node]
+    if: github.event_name == 'push'
+    strategy:
+      matrix:
+        service: [gateway, ai-engine, market-service, news-service, dashboard]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build image
+        run: |
+          DOCKERFILE="src/infra/docker/Dockerfile.${{ matrix.service }}"
+          if [ -f "$DOCKERFILE" ]; then
+            docker build -t maherai/${{ matrix.service }}:${{ github.sha }} -f "$DOCKERFILE" .
+          else
+            echo "Dockerfile not found for ${{ matrix.service }} — skipping"
+          fi
+
+  # ─── Security Scan ──────────────────────────────────────
+  security:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    needs: lint
+    permissions:
+      security-events: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: "fs"
+          scan-ref: "."
+          format: "sarif"
+          output: "trivy-results.sarif"
+          severity: "CRITICAL,HIGH"
+        continue-on-error: true
+
+      - name: Upload Trivy scan results
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: "trivy-results.sarif"
+        continue-on-error: true

@@ -1,72 +1,229 @@
-# Maher AI - QuantOps — Use Cases
+# Maher AI — QuantOps — Use Cases
 
-> **Status:** Draft  
-> **Last Updated:** 2026-04-06
+> **Status:** Active  
+> **Last Updated:** 2026-04-06  
+> **Tracking:** GitHub Issues with `use-case` label
 
 ## Overview
 
-This directory contains all use case definitions for Maher AI - QuantOps. Each use case
-follows a standardized format and is also tracked as a GitHub Issue using the
+This directory contains all use case definitions for Maher AI — QuantOps. Each use case
+follows a standardized format and is tracked as a GitHub Issue using the
 **Use Case Definition** template.
+
+---
+
+## Personas
+
+| Persona | Description | Needs | Phase |
+|---------|-------------|-------|-------|
+| **Retail Trader** | Individual who actively trades stocks, needs real-time data and AI insights | Fast decisions, clear recommendations, alerts | Phase 1 |
+| **Individual Investor** | Long-term investor who wants portfolio monitoring and trend alerts | Trend analysis, portfolio views, periodic alerts | Phase 1 |
+| **Fintech Developer** | Builds trading apps, needs API access to market data and AI signals | REST/WebSocket APIs, documentation, SDKs | Phase 3 |
+| **Platform Admin** | Manages Maher AI platform infrastructure and user accounts | System health, user management, analytics | Phase 2 |
+| **Enterprise Client** | Hedge fund or institution needing custom AI models and private deployment | Custom models, SLA, private K8s, white-label | Phase 4 |
+| **Saudi Investor** | Saudi capital market participant trading on Tadawul | Arabic NLP, Tadawul data, Shariah screening | Future |
+
+---
 
 ## Use Case Index
 
-| ID | Title | Actor(s) | Status | Priority |
-|----|-------|----------|--------|----------|
-| UC-001 | *Trader views real-time stock dashboard* | Retail Trader | Draft | P0 |
-| UC-002 | *Trader receives Maher AI buy/sell recommendation* | Retail Trader, Maher AI Agent | Draft | P0 |
-| UC-003 | *System ingests and scores news sentiment* | News API, Sentiment Analyzer | Draft | P1 |
-| UC-004 | *Trader configures smart alerts* | Retail Trader | Draft | P1 |
-| UC-005 | *Developer integrates via API* | Fintech Developer | Draft | P2 |
-| UC-006 | *Admin monitors system health* | Platform Admin | Draft | P2 |
+| ID | Title | Actor(s) | Phase | Priority | Status |
+|----|-------|----------|-------|----------|--------|
+| UC-001 | Trader views real-time stock dashboard | Retail Trader | Phase 1 | P0 | Draft |
+| UC-002 | Trader receives Maher AI buy/sell recommendation | Retail Trader, Maher AI | Phase 1 | P0 | Draft |
+| UC-003 | System ingests and scores news sentiment | News API, Sentiment Analyzer | Phase 2 | P1 | Draft |
+| UC-004 | Trader configures smart alerts | Retail Trader | Phase 2 | P1 | Draft |
+| UC-005 | Developer integrates via REST API | Fintech Developer | Phase 3 | P2 | Draft |
+| UC-006 | Admin monitors system health | Platform Admin | Phase 2 | P2 | Draft |
+| UC-007 | User registers and manages subscription | Retail Trader | Phase 3 | P1 | Draft |
+| UC-008 | System delivers real-time data via WebSocket | Fintech Developer | Phase 3 | P1 | Draft |
+| UC-009 | Trader views AI recommendation history | Retail Trader | Phase 2 | P2 | Draft |
+| UC-010 | Enterprise client deploys private instance | Enterprise Client | Phase 4 | P3 | Draft |
 
-## How to Define a Use Case
+---
 
-1. Open a GitHub Issue using the **Use Case Definition** template
-2. Assign a unique ID (e.g., `UC-007`)
-3. Follow the standard format: Actors → Preconditions → Main Flow → Postconditions
-4. Link to related features and architecture decisions
-5. Once approved, document the detailed version in this directory
+## Detailed Use Cases
+
+### UC-001: Trader Views Real-Time Stock Dashboard
+
+| Field | Detail |
+|-------|--------|
+| **Primary Actor** | Retail Trader |
+| **Secondary Actors** | Market Data Service, Grafana |
+| **Preconditions** | User is authenticated; Market data feed is active |
+| **Trigger** | User opens the Maher AI dashboard |
+
+**Main Flow:**
+1. Trader opens the Maher AI web dashboard
+2. Dashboard requests current market data from API
+3. System fetches latest stock prices from NSE via `maher-market-service`
+4. Grafana panels render live candlestick charts, volume bars, and price tickers
+5. Data auto-refreshes via WebSocket connection
+6. Trader selects a specific stock to view detailed analysis
+
+**Postconditions:**
+- Dashboard displays live market data within 2 seconds of market update
+- Trader can interact with charts (zoom, timeframe selection)
+
+**Non-Functional Requirements:**
+- Dashboard P95 load time < 2 seconds
+- Data staleness < 5 seconds during market hours
+- Support 1,000+ concurrent dashboard users in Phase 1
+
+---
+
+### UC-002: Trader Receives Maher AI Buy/Sell Recommendation
+
+| Field | Detail |
+|-------|--------|
+| **Primary Actor** | Retail Trader |
+| **Secondary Actors** | Maher AI Engine, Signal Generator, Sentiment Analyzer |
+| **Preconditions** | Market data is flowing; AI engine is running; User is authenticated |
+| **Trigger** | AI engine detects actionable signal |
+
+**Main Flow:**
+1. `maher-market-service` detects a significant price/volume event
+2. Event is published to message queue
+3. `maher-ai-engine` consumes the event and runs analysis:
+   - Technical indicator evaluation (RSI, MACD, moving averages)
+   - Sentiment score from recent news
+   - LLM reasoning for decision explanation
+4. AI engine generates recommendation: BUY / SELL / HOLD
+5. Confidence score (0–100%) is calculated
+6. Natural language explanation is generated by Maher persona
+7. Recommendation is stored and pushed to dashboard via WebSocket
+8. Trader views the recommendation card with explanation
+
+**Alternative Flows:**
+- **3a.** Sentiment data unavailable → AI proceeds with technical-only analysis, flags reduced confidence
+- **7a.** Trader has alert configured → Alert sent via email/webhook in addition to dashboard
+
+**Exception Flows:**
+- **3a.** LLM fails to respond → System falls back to rule-based signal, logs error, notifies ops
+
+**Postconditions:**
+- Recommendation stored with full context (inputs, scores, explanation)
+- Recommendation visible on dashboard within 500ms of generation
+- Audit trail recorded for regulatory compliance
+
+**Business Rules:**
+- BR-01: Recommendations must include confidence score > 60% to be shown as "strong"
+- BR-02: All recommendations must include natural language explanation
+- BR-03: Maher persona must be used (no anonymous AI outputs)
+
+---
+
+### UC-003: System Ingests and Scores News Sentiment
+
+| Field | Detail |
+|-------|--------|
+| **Primary Actor** | System (automated) |
+| **Secondary Actors** | News APIs, Sentiment Analyzer, Loki |
+| **Preconditions** | News API connections configured; NLP models loaded |
+| **Trigger** | New financial news article detected |
+
+**Main Flow:**
+1. `maher-news-service` polls configured news APIs (RSS, REST)
+2. New articles are deduplicated and validated
+3. Articles are pushed to Loki as structured log entries
+4. `maher-sentiment` service consumes new articles
+5. NLP model scores sentiment: Positive / Negative / Neutral + magnitude
+6. Sentiment score is stored and linked to relevant stock symbols
+7. Score is published to message queue for AI engine consumption
+8. Grafana dashboard updates sentiment indicators
+
+---
+
+### UC-004: Trader Configures Smart Alerts
+
+| Field | Detail |
+|-------|--------|
+| **Primary Actor** | Retail Trader |
+| **Preconditions** | User is authenticated; Alert service is running |
+| **Trigger** | User navigates to alert configuration |
+
+**Main Flow:**
+1. Trader opens alert management page
+2. Trader creates a new alert with conditions:
+   - Stock symbol
+   - Trigger type: price threshold / volume spike / news sentiment / AI signal
+   - Threshold values
+   - Delivery channels: dashboard / email / webhook
+3. System validates and stores alert configuration
+4. `maher-alert-service` monitors conditions in real-time
+5. When condition is met, alert fires and delivers via configured channels
+6. Alert history is logged and visible on dashboard
+
+---
 
 ## Use Case Diagram
 
 ```
-                     ┌─────────────────────────┐
-                     │   Maher AI - QuantOps   │
-                     │                         │
-  ┌──────────┐       │  ┌───────────────────┐  │
-  │  Retail  │──────►│  │ View Dashboard    │  │
-  │  Trader  │──────►│  │ Get AI Insights   │  │
-  │          │──────►│  │ Configure Alerts  │  │
-  └──────────┘       │  └───────────────────┘  │
-                     │                         │
-  ┌──────────┐       │  ┌───────────────────┐  │
-  │  Fintech │──────►│  │ API Integration   │  │
-  │Developer │──────►│  │ Data Streaming    │  │
-  └──────────┘       │  └───────────────────┘  │
-                     │                         │
-  ┌──────────┐       │  ┌───────────────────┐  │
-  │ Platform │──────►│  │ Monitor Health    │  │
-  │  Admin   │──────►│  │ Manage Users      │  │
-  └──────────┘       │  └───────────────────┘  │
-                     │                         │
-  ┌──────────┐       │  ┌───────────────────┐  │
-  │Enterprise│──────►│  │ Custom AI Models  │  │
-  │  Client  │──────►│  │ Private Deploy    │  │
-  └──────────┘       │  └───────────────────┘  │
-                     └─────────────────────────┘
+                      ┌──────────────────────────────┐
+                      │     Maher AI — QuantOps      │
+                      │                              │
+  ┌──────────┐        │  ┌────────────────────────┐  │
+  │  Retail  │───────►│  │ UC-001: View Dashboard │  │
+  │  Trader  │───────►│  │ UC-002: Get AI Insight │  │
+  │          │───────►│  │ UC-004: Config Alerts  │  │
+  │          │───────►│  │ UC-007: Manage Account │  │
+  │          │───────►│  │ UC-009: View History   │  │
+  └──────────┘        │  └────────────────────────┘  │
+                      │                              │
+  ┌──────────┐        │  ┌────────────────────────┐  │
+  │  Fintech │───────►│  │ UC-005: REST API       │  │
+  │Developer │───────►│  │ UC-008: WebSocket API  │  │
+  └──────────┘        │  └────────────────────────┘  │
+                      │                              │
+  ┌──────────┐        │  ┌────────────────────────┐  │
+  │ Platform │───────►│  │ UC-006: Monitor Health │  │
+  │  Admin   │        │  └────────────────────────┘  │
+  └──────────┘        │                              │
+                      │  ┌────────────────────────┐  │
+  ┌──────────┐        │  │ UC-010: Private Deploy │  │
+  │Enterprise│───────►│  │                        │  │
+  │  Client  │        │  └────────────────────────┘  │
+  └──────────┘        │                              │
+                      │  ┌────────────────────────┐  │
+  ┌──────────┐        │  │ UC-003: News Sentiment │  │
+  │  System  │───────►│  │       (Automated)      │  │
+  │(Automated│        │  └────────────────────────┘  │
+  └──────────┘        └──────────────────────────────┘
 ```
-
-## Personas
-
-| Persona | Description | Primary Use Cases |
-|---------|-------------|-------------------|
-| **Retail Trader** | Individual who actively trades stocks, needs real-time data and AI insights | UC-001, UC-002, UC-004 |
-| **Individual Investor** | Long-term investor who wants portfolio monitoring and trend alerts | UC-001, UC-004 |
-| **Fintech Developer** | Builds trading apps, needs API access to market data and AI signals | UC-005 |
-| **Platform Admin** | Manages Maher AI platform infrastructure and user accounts | UC-006 |
-| **Enterprise Client** | Hedge fund or institution needing custom AI models and private deployment | Custom |
 
 ---
 
-*Use cases will be detailed as issues are created using the Use Case Definition template.*
+## User Journey Map
+
+```
+Retail Trader Journey (Phase 1–2):
+
+Discover → Sign Up → View Dashboard → Explore Stocks → Receive AI Insight
+                                                              │
+                                          ┌───────────────────┤
+                                          ▼                   ▼
+                                    Read Explanation    Setup Alerts
+                                          │                   │
+                                          ▼                   ▼
+                                    Make Decision       Get Notified
+                                          │                   │
+                                          └───────┬───────────┘
+                                                  ▼
+                                          View History &
+                                          Track Performance
+```
+
+---
+
+## How to Define a Use Case
+
+1. Open a GitHub Issue using the **Use Case Definition** template
+2. Assign a unique ID (e.g., `UC-011`)
+3. Follow the format: Actors → Preconditions → Main Flow → Postconditions
+4. Link to related features and architecture decisions
+5. Include non-functional requirements (latency, throughput, security)
+6. Once approved, document the detailed version in this directory
+
+---
+
+[Back to README](../../README.md) • [Architecture](../architecture/README.md) • [Roadmap](../roadmap/README.md)
