@@ -1,0 +1,31 @@
+# Stock Exporter Configuration — Saudi Tadawul
+# ─────────────────────────────────────────────────────────
+
+# Server settings
+listen_address: ":9102"
+metrics_path: "/metrics"
+
+# Exchange
+exchange: "TADAWUL"
+
+# API settings
+stock_api_url: "https://api.tadawul.com.sa"
+api_key: ""
+api_secret: ""
+
+# Scrape settings
+scrape_interval: 15s
+scrape_timeout: 10s
+
+# Watchlist — Tadawul stock symbols
+symbols:
+  - "2222"    # Saudi Aramco
+  - "1180"    # Al Rajhi Bank
+  - "1010"    # Riyad Bank
+  - "7010"    # STC (Saudi Telecom)
+  - "2010"    # SABIC
+  - "1150"    # Saudi National Bank (SNB)
+  - "2280"    # Almarai
+  - "2350"    # Saudi Kayan
+  - "4030"    # Saudi Basic Industries
+  - "1120"    # Al Jazira Bank

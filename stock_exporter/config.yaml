@@ -1,0 +1,44 @@
+# Stock Exporter Configuration
+# ─────────────────────────────────────────────────────────
+
+# Server settings
+listen_address: ":9101"
+metrics_path: "/metrics"
+
+# Exchange: NSE | TADAWUL | IB
+exchange: "NSE"
+
+# ─── Kite Connect Settings (Phase 0.1 — Zerodha WebSocket) ───
+# Obtain credentials from: https://developers.kite.trade/
+# Env overrides: KITE_API_KEY, KITE_API_SECRET, KITE_ACCESS_TOKEN, KITE_REQUEST_TOKEN
+kite:
+  api_key: ""              # Your Kite Connect API key
+  api_secret: ""           # Your Kite Connect API secret
+  access_token: ""         # Access token (obtained via OAuth login flow, expires daily 6AM IST)
+  request_token: ""        # One-time request token (used to generate access_token)
+  ticker_mode: "full"      # ltp | quote | full (full = includes 5-level market depth)
+  currency: "INR"
+  max_reconnect_attempts: 50
+  reconnect_interval: 5s
+
+# Legacy REST API settings (fallback when Kite is not configured)
+stock_api_url: "https://api.kite.trade"
+api_key: ""
+api_secret: ""
+
+# Scrape settings (used for REST fallback only; WebSocket pushes in real-time)
+scrape_interval: 15s
+scrape_timeout: 10s
+
+# Watchlist — NSE trading symbols to subscribe
+symbols:
+  - RELIANCE
+  - TCS
+  - INFY
+  - HDFCBANK
+  - ICICIBANK
+  - SBIN
+  - BHARTIARTL
+  - ITC
+  - KOTAKBANK
+  - LT
