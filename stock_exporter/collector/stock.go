@@ -8,20 +8,25 @@ import (
 	"github.com/maherai/stock_exporter/internal/client"
 )
 
-// Scraper periodically fetches stock data from the exchange API
-// and updates the StockClient's internal cache. The Prometheus collector
-// reads from this cache on each /metrics scrape.
+// Scraper periodically fetches stock data from an exchange API
+// and reports scrape results. It depends on the DataFetcher interface
+// rather than a concrete client type.
+//
+// SOLID:
+//   - DIP: depends on DataFetcher interface, not *client.StockClient.
+//   - SRP: only responsible for scheduling scrapes; HTTP logic is in the client.
+//   - LSP: any DataFetcher (StockClient, TadawulClient, mock) can be substituted.
 type Scraper struct {
-	client   *client.StockClient
+	fetcher  client.DataFetcher
 	symbols  []string
 	interval time.Duration
 	logger   *slog.Logger
 }
 
 // NewScraper creates a new background scraper.
-func NewScraper(sc *client.StockClient, symbols []string, interval time.Duration, logger *slog.Logger) *Scraper {
+func NewScraper(fetcher client.DataFetcher, symbols []string, interval time.Duration, logger *slog.Logger) *Scraper {
 	return &Scraper{
-		client:   sc,
+		fetcher:  fetcher,
 		symbols:  symbols,
 		interval: interval,
 		logger:   logger,
@@ -55,7 +60,7 @@ func (s *Scraper) Run(ctx context.Context) {
 // scrape performs a single round of data fetching.
 func (s *Scraper) scrape() {
 	start := time.Now()
-	success, errs := s.client.FetchAll(s.symbols)
+	success, errs := s.fetcher.FetchAll(s.symbols)
 	elapsed := time.Since(start)
 
 	s.logger.Info("scrape completed",

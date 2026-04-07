@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"math/rand"
 	"runtime"
 	"sort"
@@ -47,7 +48,8 @@ func runBench(cmd *cobra.Command, args []string) error {
 		workers = runtime.NumCPU()
 	}
 
-	logger := appLogger
+	app := appFromCmd(cmd)
+	logger := app.Logger
 	fmt.Println("═══════════════════════════════════════════════════")
 	fmt.Println("  Stock Exporter — Performance Benchmark")
 	fmt.Println("═══════════════════════════════════════════════════")
@@ -160,9 +162,9 @@ func benchDirectWrite(store *client.FastTickStore, tokenMap map[uint32]string, d
 }
 
 // benchIngestionPipeline measures ring buffer → worker pool → store throughput.
-func benchIngestionPipeline(store *client.FastTickStore, tokenMap map[uint32]string, bufSize, workers int, duration time.Duration, logger interface{ Info(string, ...any) }) {
+func benchIngestionPipeline(store *client.FastTickStore, tokenMap map[uint32]string, bufSize, workers int, duration time.Duration, logger *slog.Logger) {
 	ringBuf := client.NewRingBuffer(bufSize)
-	pool := client.NewIngestionPool(ringBuf, store, workers, appLogger)
+	pool := client.NewIngestionPool(ringBuf, store, workers, logger)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -225,8 +227,8 @@ func benchIngestionPipeline(store *client.FastTickStore, tokenMap map[uint32]str
 }
 
 // benchMetricsCacheBuild measures MetricsCache build latency.
-func benchMetricsCacheBuild(store *client.FastTickStore, numSymbols, iterations int, logger interface{ Info(string, ...any) }) {
-	cache := collector.NewMetricsCache(store, "NSE", appLogger)
+func benchMetricsCacheBuild(store *client.FastTickStore, numSymbols, iterations int, logger *slog.Logger) {
+	cache := collector.NewMetricsCache(store, "NSE", logger)
 
 	latencies := make([]time.Duration, iterations)
 	for i := 0; i < iterations; i++ {
@@ -240,8 +242,8 @@ func benchMetricsCacheBuild(store *client.FastTickStore, numSymbols, iterations 
 }
 
 // benchParallelCollect measures live parallel Collect() latency.
-func benchParallelCollect(store *client.FastTickStore, numSymbols, iterations, workers int, logger interface{ Info(string, ...any) }) {
-	coll := collector.NewFastStockCollector(store, "NSE", workers, appLogger)
+func benchParallelCollect(store *client.FastTickStore, numSymbols, iterations, workers int, logger *slog.Logger) {
+	coll := collector.NewFastStockCollector(store, "NSE", workers, logger)
 
 	latencies := make([]time.Duration, iterations)
 	for i := 0; i < iterations; i++ {

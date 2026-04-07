@@ -7,12 +7,17 @@ import (
 	"time"
 )
 
-// IngestionPool is a pool of worker goroutines that drain the RingBuffer
-// and write ticks into the FastTickStore. It decouples the WebSocket
+// IngestionPool is a pool of worker goroutines that drain a BatchDequeuer
+// and write ticks into a TickUpdater. It decouples the WebSocket
 // callback from store write latency.
+//
+// SOLID:
+//   - DIP: depends on BatchDequeuer and TickUpdater interfaces, not concrete types.
+//   - SRP: only responsible for draining and forwarding; no business logic.
+//   - OCP: works with any buffer/store implementation satisfying the interfaces.
 type IngestionPool struct {
-	ringBuf    *RingBuffer
-	store      *FastTickStore
+	source     BatchDequeuer
+	sink       TickUpdater
 	numWorkers int
 	logger     *slog.Logger
 	batchSize  int
@@ -20,13 +25,13 @@ type IngestionPool struct {
 
 // NewIngestionPool creates an ingestion pool. If numWorkers is 0,
 // it defaults to runtime.NumCPU().
-func NewIngestionPool(ringBuf *RingBuffer, store *FastTickStore, numWorkers int, logger *slog.Logger) *IngestionPool {
+func NewIngestionPool(source BatchDequeuer, sink TickUpdater, numWorkers int, logger *slog.Logger) *IngestionPool {
 	if numWorkers <= 0 {
 		numWorkers = runtime.NumCPU()
 	}
 	return &IngestionPool{
-		ringBuf:    ringBuf,
-		store:      store,
+		source:     source,
+		sink:       sink,
 		numWorkers: numWorkers,
 		logger:     logger,
 		batchSize:  256,
@@ -38,7 +43,7 @@ func (ip *IngestionPool) Start(ctx context.Context) {
 	ip.logger.Info("starting ingestion pool",
 		"workers", ip.numWorkers,
 		"batch_size", ip.batchSize,
-		"ring_buffer_cap", ip.ringBuf.Cap(),
+		"buffer_cap", ip.source.Cap(),
 	)
 
 	for i := 0; i < ip.numWorkers; i++ {
@@ -47,7 +52,7 @@ func (ip *IngestionPool) Start(ctx context.Context) {
 }
 
 // worker is the main loop for a single ingestion worker. It dequeues ticks
-// from the ring buffer in batches and writes them to the FastTickStore.
+// from the source in batches and writes them to the sink.
 func (ip *IngestionPool) worker(ctx context.Context, id int) {
 	batch := make([]*TickData, ip.batchSize)
 
@@ -59,7 +64,7 @@ func (ip *IngestionPool) worker(ctx context.Context, id int) {
 		default:
 		}
 
-		n := ip.ringBuf.DequeueBatch(batch)
+		n := ip.source.DequeueBatch(batch)
 		if n == 0 {
 			// No data available — back off briefly to avoid busy-spinning.
 			// 100μs is short enough to maintain <1ms latency while saving CPU.
@@ -67,9 +72,9 @@ func (ip *IngestionPool) worker(ctx context.Context, id int) {
 			continue
 		}
 
-		// Write batch to store
+		// Write batch to sink
 		for i := 0; i < n; i++ {
-			ip.store.Update(batch[i])
+			ip.sink.Update(batch[i])
 			batch[i] = nil // help GC
 		}
 	}

@@ -18,11 +18,17 @@ import (
 // MetricsCache implements Design A: Pre-Computed Metrics Cache.
 //
 // A background goroutine continuously rebuilds the full Prometheus text-format
-// response from the FastTickStore. The HTTP handler serves the pre-built bytes
+// response from a TickSnapshotProvider. The HTTP handler serves the pre-built bytes
 // with near-zero latency (<1ms), completely decoupling scrape latency from
 // tick ingestion.
+//
+// SOLID:
+//   - DIP: depends on TickSnapshotProvider interface, not a concrete store.
+//   - SRP: only responsible for caching and serving; metric definitions live
+//     in descriptors.go.
+//   - OCP: new metrics are added by updating descriptors.go constants.
 type MetricsCache struct {
-	store    *client.FastTickStore
+	store    client.TickSnapshotProvider
 	exchange string
 	logger   *slog.Logger
 
@@ -46,7 +52,8 @@ type CachedResponse struct {
 }
 
 // NewMetricsCache creates a new pre-computed metrics cache.
-func NewMetricsCache(store *client.FastTickStore, exchange string, logger *slog.Logger) *MetricsCache {
+// Accepts any TickSnapshotProvider, enabling use with both FastTickStore and TickStore.
+func NewMetricsCache(store client.TickSnapshotProvider, exchange string, logger *slog.Logger) *MetricsCache {
 	mc := &MetricsCache{
 		store:    store,
 		exchange: exchange,
@@ -179,196 +186,196 @@ func (mc *MetricsCache) writeMetrics(buf *bytes.Buffer, ticks []client.TickData)
 	if len(ticks) > 0 {
 		scrapeSuccess = 1.0
 	}
-	writeHeader(buf, "maher_exchange_scrape_success", "gauge", "Whether ticks are being received (1=yes, 0=no)")
-	fmt.Fprintf(buf, "maher_exchange_scrape_success{exchange=%q} %g\n", exchange, scrapeSuccess)
+	writeHeader(buf, MetricScrapeSuccess, "gauge", MetricHelpString(MetricScrapeSuccess))
+	fmt.Fprintf(buf, "%s{exchange=%q} %g\n", MetricScrapeSuccess, exchange, scrapeSuccess)
 
-	writeHeader(buf, "maher_exchange_up", "gauge", "Whether the exporter is up")
-	fmt.Fprintf(buf, "maher_exchange_up{exchange=%q} 1\n", exchange)
+	writeHeader(buf, MetricUp, "gauge", MetricHelpString(MetricUp))
+	fmt.Fprintf(buf, "%s{exchange=%q} 1\n", MetricUp, exchange)
 
-	writeHeader(buf, "maher_exchange_instruments_active", "gauge", "Number of instruments with live tick data")
-	fmt.Fprintf(buf, "maher_exchange_instruments_active{exchange=%q} %d\n", exchange, len(ticks))
+	writeHeader(buf, MetricInstrumentsActive, "gauge", MetricHelpString(MetricInstrumentsActive))
+	fmt.Fprintf(buf, "%s{exchange=%q} %d\n", MetricInstrumentsActive, exchange, len(ticks))
 
 	// ─── Exporter internal metrics ───────────────────────
-	writeHeader(buf, "maher_exporter_cache_build_time_seconds", "gauge", "Time taken to rebuild the metrics cache")
+	writeHeader(buf, MetricCacheBuildTime, "gauge", MetricHelpString(MetricCacheBuildTime))
 	resp := mc.current.Load()
 	if resp != nil {
-		fmt.Fprintf(buf, "maher_exporter_cache_build_time_seconds{exchange=%q} %g\n", exchange, resp.BuildTime.Seconds())
+		fmt.Fprintf(buf, "%s{exchange=%q} %g\n", MetricCacheBuildTime, exchange, resp.BuildTime.Seconds())
 	}
 
-	writeHeader(buf, "maher_exchange_scrape_duration_seconds", "gauge", "Time taken to collect all metrics")
+	writeHeader(buf, MetricScrapeDuration, "gauge", MetricHelpString(MetricScrapeDuration))
 	if resp != nil {
-		fmt.Fprintf(buf, "maher_exchange_scrape_duration_seconds{exchange=%q} %g\n", exchange, resp.BuildTime.Seconds())
+		fmt.Fprintf(buf, "%s{exchange=%q} %g\n", MetricScrapeDuration, exchange, resp.BuildTime.Seconds())
 	}
 
-	writeHeader(buf, "maher_exchange_scrape_errors_total", "counter", "Total number of scrape errors")
-	fmt.Fprintf(buf, "maher_exchange_scrape_errors_total{exchange=%q} 0\n", exchange)
+	writeHeader(buf, MetricScrapeErrorsTotal, "counter", MetricHelpString(MetricScrapeErrorsTotal))
+	fmt.Fprintf(buf, "%s{exchange=%q} 0\n", MetricScrapeErrorsTotal, exchange)
 
 	if len(ticks) == 0 {
 		return
 	}
 
 	// ─── Price metrics ───────────────────────────────────
-	writeHeader(buf, "maher_stock_price_current", "gauge", "Current/last traded price of the stock")
+	writeHeader(buf, MetricPriceCurrent, "gauge", MetricHelpString(MetricPriceCurrent))
 	for i := range ticks {
 		td := &ticks[i]
 		if td.Symbol == "" {
 			continue
 		}
-		fmt.Fprintf(buf, "maher_stock_price_current{symbol=%q,exchange=%q,currency=%q} %g\n",
-			td.Symbol, td.Exchange, currency(td.Currency), td.LastPrice)
+		fmt.Fprintf(buf, "%s{symbol=%q,exchange=%q,currency=%q} %g\n",
+			MetricPriceCurrent, td.Symbol, td.Exchange, currency(td.Currency), td.LastPrice)
 	}
 
-	writeHeader(buf, "maher_stock_price_open", "gauge", "Opening price of the day")
+	writeHeader(buf, MetricPriceOpen, "gauge", MetricHelpString(MetricPriceOpen))
 	for i := range ticks {
 		td := &ticks[i]
 		if td.Symbol == "" {
 			continue
 		}
-		fmt.Fprintf(buf, "maher_stock_price_open{symbol=%q,exchange=%q,currency=%q} %g\n",
-			td.Symbol, td.Exchange, currency(td.Currency), td.OpenPrice)
+		fmt.Fprintf(buf, "%s{symbol=%q,exchange=%q,currency=%q} %g\n",
+			MetricPriceOpen, td.Symbol, td.Exchange, currency(td.Currency), td.OpenPrice)
 	}
 
-	writeHeader(buf, "maher_stock_price_high", "gauge", "Intraday high price")
+	writeHeader(buf, MetricPriceHigh, "gauge", MetricHelpString(MetricPriceHigh))
 	for i := range ticks {
 		td := &ticks[i]
 		if td.Symbol == "" {
 			continue
 		}
-		fmt.Fprintf(buf, "maher_stock_price_high{symbol=%q,exchange=%q,currency=%q} %g\n",
-			td.Symbol, td.Exchange, currency(td.Currency), td.HighPrice)
+		fmt.Fprintf(buf, "%s{symbol=%q,exchange=%q,currency=%q} %g\n",
+			MetricPriceHigh, td.Symbol, td.Exchange, currency(td.Currency), td.HighPrice)
 	}
 
-	writeHeader(buf, "maher_stock_price_low", "gauge", "Intraday low price")
+	writeHeader(buf, MetricPriceLow, "gauge", MetricHelpString(MetricPriceLow))
 	for i := range ticks {
 		td := &ticks[i]
 		if td.Symbol == "" {
 			continue
 		}
-		fmt.Fprintf(buf, "maher_stock_price_low{symbol=%q,exchange=%q,currency=%q} %g\n",
-			td.Symbol, td.Exchange, currency(td.Currency), td.LowPrice)
+		fmt.Fprintf(buf, "%s{symbol=%q,exchange=%q,currency=%q} %g\n",
+			MetricPriceLow, td.Symbol, td.Exchange, currency(td.Currency), td.LowPrice)
 	}
 
-	writeHeader(buf, "maher_stock_price_close_prev", "gauge", "Previous closing price")
+	writeHeader(buf, MetricPriceClosePrev, "gauge", MetricHelpString(MetricPriceClosePrev))
 	for i := range ticks {
 		td := &ticks[i]
 		if td.Symbol == "" {
 			continue
 		}
-		fmt.Fprintf(buf, "maher_stock_price_close_prev{symbol=%q,exchange=%q,currency=%q} %g\n",
-			td.Symbol, td.Exchange, currency(td.Currency), td.ClosePrice)
+		fmt.Fprintf(buf, "%s{symbol=%q,exchange=%q,currency=%q} %g\n",
+			MetricPriceClosePrev, td.Symbol, td.Exchange, currency(td.Currency), td.ClosePrice)
 	}
 
-	writeHeader(buf, "maher_stock_price_change_percent", "gauge", "Price change percentage from previous close")
+	writeHeader(buf, MetricPriceChangePercent, "gauge", MetricHelpString(MetricPriceChangePercent))
 	for i := range ticks {
 		td := &ticks[i]
 		if td.Symbol == "" {
 			continue
 		}
-		fmt.Fprintf(buf, "maher_stock_price_change_percent{symbol=%q,exchange=%q,currency=%q} %g\n",
-			td.Symbol, td.Exchange, currency(td.Currency), td.ChangePercent)
+		fmt.Fprintf(buf, "%s{symbol=%q,exchange=%q,currency=%q} %g\n",
+			MetricPriceChangePercent, td.Symbol, td.Exchange, currency(td.Currency), td.ChangePercent)
 	}
 
 	// ─── Volume metrics ──────────────────────────────────
-	writeHeader(buf, "maher_stock_volume_total", "gauge", "Total traded volume for the day")
+	writeHeader(buf, MetricVolumeTotal, "gauge", MetricHelpString(MetricVolumeTotal))
 	for i := range ticks {
 		td := &ticks[i]
 		if td.Symbol == "" {
 			continue
 		}
-		fmt.Fprintf(buf, "maher_stock_volume_total{symbol=%q,exchange=%q} %d\n",
-			td.Symbol, td.Exchange, td.VolumeTraded)
+		fmt.Fprintf(buf, "%s{symbol=%q,exchange=%q} %d\n",
+			MetricVolumeTotal, td.Symbol, td.Exchange, td.VolumeTraded)
 	}
 
-	writeHeader(buf, "maher_stock_volume_buy", "gauge", "Total buy-side quantity")
+	writeHeader(buf, MetricVolumeBuy, "gauge", MetricHelpString(MetricVolumeBuy))
 	for i := range ticks {
 		td := &ticks[i]
 		if td.Symbol == "" {
 			continue
 		}
-		fmt.Fprintf(buf, "maher_stock_volume_buy{symbol=%q,exchange=%q} %d\n",
-			td.Symbol, td.Exchange, td.TotalBuyQuantity)
+		fmt.Fprintf(buf, "%s{symbol=%q,exchange=%q} %d\n",
+			MetricVolumeBuy, td.Symbol, td.Exchange, td.TotalBuyQuantity)
 	}
 
-	writeHeader(buf, "maher_stock_volume_sell", "gauge", "Total sell-side quantity")
+	writeHeader(buf, MetricVolumeSell, "gauge", MetricHelpString(MetricVolumeSell))
 	for i := range ticks {
 		td := &ticks[i]
 		if td.Symbol == "" {
 			continue
 		}
-		fmt.Fprintf(buf, "maher_stock_volume_sell{symbol=%q,exchange=%q} %d\n",
-			td.Symbol, td.Exchange, td.TotalSellQuantity)
+		fmt.Fprintf(buf, "%s{symbol=%q,exchange=%q} %d\n",
+			MetricVolumeSell, td.Symbol, td.Exchange, td.TotalSellQuantity)
 	}
 
-	writeHeader(buf, "maher_stock_last_traded_qty", "gauge", "Last traded quantity")
+	writeHeader(buf, MetricLastTradedQty, "gauge", MetricHelpString(MetricLastTradedQty))
 	for i := range ticks {
 		td := &ticks[i]
 		if td.Symbol == "" {
 			continue
 		}
-		fmt.Fprintf(buf, "maher_stock_last_traded_qty{symbol=%q,exchange=%q} %d\n",
-			td.Symbol, td.Exchange, td.LastTradedQty)
+		fmt.Fprintf(buf, "%s{symbol=%q,exchange=%q} %d\n",
+			MetricLastTradedQty, td.Symbol, td.Exchange, td.LastTradedQty)
 	}
 
-	writeHeader(buf, "maher_stock_vwap", "gauge", "Volume weighted average price")
+	writeHeader(buf, MetricVWAP, "gauge", MetricHelpString(MetricVWAP))
 	for i := range ticks {
 		td := &ticks[i]
 		if td.Symbol == "" {
 			continue
 		}
-		fmt.Fprintf(buf, "maher_stock_vwap{symbol=%q,exchange=%q} %g\n",
-			td.Symbol, td.Exchange, td.AverageTradePrice)
+		fmt.Fprintf(buf, "%s{symbol=%q,exchange=%q} %g\n",
+			MetricVWAP, td.Symbol, td.Exchange, td.AverageTradePrice)
 	}
 
 	// ─── Order book metrics ──────────────────────────────
-	writeHeader(buf, "maher_stock_bid_price", "gauge", "Best bid price")
+	writeHeader(buf, MetricBidPrice, "gauge", MetricHelpString(MetricBidPrice))
 	for i := range ticks {
 		td := &ticks[i]
 		if td.Symbol == "" {
 			continue
 		}
-		fmt.Fprintf(buf, "maher_stock_bid_price{symbol=%q,exchange=%q,depth=\"1\"} %g\n",
-			td.Symbol, td.Exchange, td.BidPrice)
+		fmt.Fprintf(buf, "%s{symbol=%q,exchange=%q,depth=\"1\"} %g\n",
+			MetricBidPrice, td.Symbol, td.Exchange, td.BidPrice)
 	}
 
-	writeHeader(buf, "maher_stock_ask_price", "gauge", "Best ask price")
+	writeHeader(buf, MetricAskPrice, "gauge", MetricHelpString(MetricAskPrice))
 	for i := range ticks {
 		td := &ticks[i]
 		if td.Symbol == "" {
 			continue
 		}
-		fmt.Fprintf(buf, "maher_stock_ask_price{symbol=%q,exchange=%q,depth=\"1\"} %g\n",
-			td.Symbol, td.Exchange, td.AskPrice)
+		fmt.Fprintf(buf, "%s{symbol=%q,exchange=%q,depth=\"1\"} %g\n",
+			MetricAskPrice, td.Symbol, td.Exchange, td.AskPrice)
 	}
 
-	writeHeader(buf, "maher_stock_bid_quantity", "gauge", "Bid quantity at depth")
+	writeHeader(buf, MetricBidQty, "gauge", MetricHelpString(MetricBidQty))
 	for i := range ticks {
 		td := &ticks[i]
 		if td.Symbol == "" {
 			continue
 		}
-		fmt.Fprintf(buf, "maher_stock_bid_quantity{symbol=%q,exchange=%q,depth=\"1\"} %d\n",
-			td.Symbol, td.Exchange, td.BidQty)
+		fmt.Fprintf(buf, "%s{symbol=%q,exchange=%q,depth=\"1\"} %d\n",
+			MetricBidQty, td.Symbol, td.Exchange, td.BidQty)
 	}
 
-	writeHeader(buf, "maher_stock_ask_quantity", "gauge", "Ask quantity at depth")
+	writeHeader(buf, MetricAskQty, "gauge", MetricHelpString(MetricAskQty))
 	for i := range ticks {
 		td := &ticks[i]
 		if td.Symbol == "" {
 			continue
 		}
-		fmt.Fprintf(buf, "maher_stock_ask_quantity{symbol=%q,exchange=%q,depth=\"1\"} %d\n",
-			td.Symbol, td.Exchange, td.AskQty)
+		fmt.Fprintf(buf, "%s{symbol=%q,exchange=%q,depth=\"1\"} %d\n",
+			MetricAskQty, td.Symbol, td.Exchange, td.AskQty)
 	}
 
-	writeHeader(buf, "maher_stock_spread", "gauge", "Bid-ask spread")
+	writeHeader(buf, MetricSpread, "gauge", MetricHelpString(MetricSpread))
 	for i := range ticks {
 		td := &ticks[i]
 		if td.Symbol == "" {
 			continue
 		}
 		spread := td.AskPrice - td.BidPrice
-		fmt.Fprintf(buf, "maher_stock_spread{symbol=%q,exchange=%q} %g\n",
-			td.Symbol, td.Exchange, spread)
+		fmt.Fprintf(buf, "%s{symbol=%q,exchange=%q} %g\n",
+			MetricSpread, td.Symbol, td.Exchange, spread)
 	}
 }
 

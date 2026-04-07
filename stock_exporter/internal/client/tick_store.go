@@ -107,3 +107,28 @@ func (ts *TickStore) Count() int {
 	defer ts.mu.RUnlock()
 	return len(ts.ticks)
 }
+
+// Snapshot returns a contiguous copy of all ticks as a slice.
+// Satisfies the TickSnapshotProvider interface so TickStore can be used
+// interchangeably with FastTickStore by collectors.
+func (ts *TickStore) Snapshot() []TickData {
+	ts.mu.RLock()
+	defer ts.mu.RUnlock()
+
+	out := make([]TickData, 0, len(ts.ticks))
+	for _, td := range ts.ticks {
+		if td != nil {
+			out = append(out, *td)
+		}
+	}
+	return out
+}
+
+// TotalVersion returns a monotonically increasing version counter.
+// For the legacy TickStore, this returns the count of instruments as a
+// simple change indicator. Satisfies the TickSnapshotProvider interface.
+func (ts *TickStore) TotalVersion() uint64 {
+	ts.mu.RLock()
+	defer ts.mu.RUnlock()
+	return uint64(len(ts.ticks))
+}

@@ -35,8 +35,9 @@ func init() {
 }
 
 func runServe(cmd *cobra.Command, args []string) error {
-	cfg := appConfig
-	logger := appLogger
+	app := appFromCmd(cmd)
+	cfg := app.Config
+	logger := app.Logger
 
 	logger.Info("configuration loaded",
 		"listen", cfg.ListenAddress,
