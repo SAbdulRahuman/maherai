@@ -1,39 +1,468 @@
 # Stock Exporter
 
-## Overview
-The Stock Exporter is a Prometheus exporter designed to collect and expose stock market metrics. It gathers data from various stock APIs and provides a metrics endpoint for Prometheus to scrape.
+High-performance Prometheus exporter for real-time stock market data. Supports 3000+ instruments with sub-second scrape latency via Kite Connect WebSocket (NSE) or REST polling (Tadawul/fallback).
 
 ```
-Kite WebSocket → OnTick → TickStore (sync.RWMutex) → StockCollector → /metrics
+Kite WebSocket ─► RingBuffer ─► IngestionPool ─► FastTickStore ─► MetricsCache ─► /metrics
+                                                                 (pre-built, <1ms serve)
 ```
 
 ## Features
-- Collects stock-related metrics from multiple sources.
-- Implements the Prometheus Collector interface for easy integration.
-- Configurable through environment variables and configuration files.
 
+- **3000+ symbols** with 50K–100K ticks/sec ingestion throughput
+- **Sub-millisecond** `/metrics` scrape via pre-computed cache (Design A)
+- **Kite Connect WebSocket** — real-time NSE market data (primary)
+- **REST polling fallback** — works without WebSocket credentials
+- **Tadawul support** — Saudi stock exchange via dedicated client
+- **18 Prometheus metrics** per symbol — price, volume, order book, spread
+- **Cobra CLI** — subcommands: `serve`, `bench`, `validate`, `version`
+- **Channel-backed ring buffer** and pre-allocated flat-slice data store
+- **Parallel metric collection** with configurable worker count
+- **Gzip compression** on `/metrics` responses
+- **Distroless Docker** image (non-root, minimal attack surface)
 
-## Installation
-To install the Stock Exporter, clone the repository and run the following commands:
+---
+
+## Prerequisites
+
+| Requirement | Version |
+|-------------|---------|
+| Go | 1.24+ |
+| Docker | 20+ (optional, for container builds) |
+| Make | any (optional, for convenience targets) |
+
+For Kite WebSocket mode you also need:
+- A [Kite Connect](https://developers.kite.trade/) API key + secret
+- A valid access token (expires daily at 6 AM IST)
+
+---
+
+## Quick Start
 
 ```bash
-go mod tidy
+# Clone
+git clone https://github.com/maherai/stock_exporter.git
+cd stock_exporter
+
+# Build
+make build
+
+# Validate config
+./stock_exporter validate --config config.yaml
+
+# Start (REST fallback mode — no Kite credentials needed)
+./stock_exporter serve --config config.yaml
+
+# Open in browser
+curl http://localhost:9101/metrics
 ```
 
-Kite WebSocket → OnTick → TickStore (sync.RWMutex) → StockCollector → /metrics## Usage
-To run the Stock Exporter, execute the following command:
+---
+
+## Build
+
+### From Source
 
 ```bash
-go run cmd/main.go
+# Build the binary (injects version/commit/date via ldflags)
+make build
+# Output: ./stock_exporter
+
+# Or manually:
+CGO_ENABLED=0 go build -o stock_exporter ./cmd/
 ```
 
-The exporter will start an HTTP server and expose metrics at the `/metrics` endpoint.
+### Docker
+
+```bash
+# Build image
+make docker
+# → stock_exporter:latest
+
+# Or manually:
+docker build -t stock_exporter:latest .
+```
+
+---
+
+## Install
+
+### Binary
+
+Copy the built binary anywhere on your `$PATH`:
+
+```bash
+make build
+sudo cp stock_exporter /usr/local/bin/
+```
+
+### Docker
+
+```bash
+docker pull ghcr.io/maherai/stock_exporter:latest
+# or build locally:
+make docker
+```
+
+---
+
+## Tests
+
+```bash
+# Run all tests with race detector
+make test
+
+# Or manually:
+go test -v -race -count=1 ./...
+
+# Run a specific package
+go test -v -race ./internal/client/ -run TestFastTickStore
+go test -v -race ./collector/ -run TestMetricsCache
+```
+
+### Built-in Benchmark
+
+The `bench` subcommand generates synthetic ticks and measures the full pipeline:
+
+```bash
+# Benchmark with 3000 symbols (default)
+./stock_exporter bench --config config.yaml --symbols 3000
+
+# Quick benchmark
+./stock_exporter bench --config config.yaml --symbols 3000 --iterations 20 --ingestion-duration 2s
+```
+
+Example output:
+```
+[1] FastTickStore Direct Write Throughput
+  Throughput:    6,900,000 ops/sec
+  Per-op avg:    144 ns
+
+[2] Ring Buffer → Ingestion Pool Throughput
+  Throughput:    1,800,000 enqueue/sec
+
+[3] MetricsCache Build Latency (Design A)
+  Build p50:     54ms
+  Build p95:     76ms
+
+[4] Parallel Collect Latency (Design B)
+  Collect p50:   357µs
+  Collect p95:   1.9ms
+```
+
+---
+
+## Usage
+
+### CLI Commands
+
+```bash
+stock_exporter [command] [flags]
+```
+
+| Command | Description |
+|---------|-------------|
+| `serve` | Start the HTTP server and begin exporting metrics |
+| `version` | Print version, commit, and build date |
+| `validate` | Validate config file and exit (useful for CI/CD) |
+| `bench` | Run built-in performance benchmark |
+
+### Global Flags
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `-c, --config` | `""` | Path to YAML configuration file |
+| `--log-level` | `info` | Log level: `debug`, `info`, `warn`, `error` |
+| `--log-format` | `text` | Log format: `text`, `json` |
+
+### Serve Flags
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--workers` | `0` (NumCPU) | Number of parallel collector workers |
+| `--buffer-size` | `131072` | Ingestion ring buffer capacity |
+| `--metrics-mode` | `cached` | Metrics mode: `cached` (Design A), `live` (Design B) |
+
+### Examples
+
+```bash
+# NSE with Kite WebSocket (primary mode)
+KITE_API_KEY=xxx KITE_ACCESS_TOKEN=yyy \
+  ./stock_exporter serve --config config.yaml
+
+# NSE with REST fallback
+./stock_exporter serve --config config.yaml
+
+# Saudi Tadawul
+./stock_exporter serve --config config.tadawul.yaml
+
+# Live parallel collect mode (Design B) instead of cached
+./stock_exporter serve --config config.yaml --metrics-mode live
+
+# JSON structured logging
+./stock_exporter serve --config config.yaml --log-format json --log-level debug
+
+# 16 parallel workers with 256K ring buffer
+./stock_exporter serve --config config.yaml --workers 16 --buffer-size 262144
+```
+
+### Docker
+
+```bash
+# NSE (port 9101)
+docker run --rm -p 9101:9101 stock_exporter:latest
+
+# Tadawul (port 9102)
+docker run --rm -p 9102:9102 \
+  stock_exporter:latest serve --config /etc/stock_exporter/config.tadawul.yaml
+
+# With Kite credentials
+docker run --rm -p 9101:9101 \
+  -e KITE_API_KEY=your_api_key \
+  -e KITE_ACCESS_TOKEN=your_token \
+  stock_exporter:latest
+```
+
+---
 
 ## Configuration
-The Stock Exporter can be configured using environment variables or a configuration file. Refer to `config/config.go` for available configuration options.
+
+Configuration is loaded from a YAML file (`--config`) with environment variable overrides.
+
+### NSE Config (`config.yaml`)
+
+```yaml
+listen_address: ":9101"
+metrics_path: "/metrics"
+exchange: "NSE"
+
+kite:
+  api_key: ""              # or env: KITE_API_KEY
+  api_secret: ""           # or env: KITE_API_SECRET
+  access_token: ""         # or env: KITE_ACCESS_TOKEN
+  ticker_mode: "full"      # ltp | quote | full
+  currency: "INR"
+
+scrape_interval: 15s       # REST fallback polling interval
+scrape_timeout: 10s
+
+symbols:
+  - RELIANCE
+  - TCS
+  - INFY
+  - HDFCBANK
+  # ... add up to 3000+ symbols
+```
+
+### Tadawul Config (`config.tadawul.yaml`)
+
+```yaml
+listen_address: ":9102"
+metrics_path: "/metrics"
+exchange: "TADAWUL"
+
+stock_api_url: "https://api.tadawul.com.sa"
+scrape_interval: 15s
+
+symbols:
+  - "2222"    # Saudi Aramco
+  - "1180"    # Al Rajhi Bank
+  - "7010"    # STC
+```
+
+### Environment Variables
+
+| Variable | Overrides |
+|----------|-----------|
+| `KITE_API_KEY` | `kite.api_key` |
+| `KITE_API_SECRET` | `kite.api_secret` |
+| `KITE_ACCESS_TOKEN` | `kite.access_token` |
+| `KITE_REQUEST_TOKEN` | `kite.request_token` |
+| `KITE_TICKER_MODE` | `kite.ticker_mode` |
+| `EXPORTER_LISTEN_ADDRESS` | `listen_address` |
+| `EXPORTER_METRICS_PATH` | `metrics_path` |
+| `EXPORTER_EXCHANGE` | `exchange` |
+| `STOCK_API_URL` | `stock_api_url` |
+| `STOCK_API_KEY` | `api_key` |
+| `SCRAPE_INTERVAL` | `scrape_interval` (seconds) |
+
+---
+
+## Endpoints
+
+| Path | Description |
+|------|-------------|
+| `/metrics` | Prometheus metrics (scrape target) |
+| `/health` | Liveness probe — always returns `200` |
+| `/ready` | Readiness probe — `200` if tick data loaded, `503` otherwise |
+| `/` | Landing page with exporter status |
+
+---
+
+## Metrics
+
+All metrics use the `maher_stock_*` or `maher_exchange_*` namespace.
+
+### Per-Symbol Metrics (labels: `symbol`, `exchange`, `currency`)
+
+| Metric | Description |
+|--------|-------------|
+| `maher_stock_price_current` | Current/last traded price |
+| `maher_stock_price_open` | Opening price |
+| `maher_stock_price_high` | Intraday high |
+| `maher_stock_price_low` | Intraday low |
+| `maher_stock_price_close_prev` | Previous close |
+| `maher_stock_price_change_percent` | Change % from prev close |
+| `maher_stock_volume_total` | Total traded volume |
+| `maher_stock_volume_buy` | Buy-side quantity |
+| `maher_stock_volume_sell` | Sell-side quantity |
+| `maher_stock_last_traded_qty` | Last traded quantity |
+| `maher_stock_vwap` | Volume-weighted average price |
+| `maher_stock_bid_price` | Best bid price |
+| `maher_stock_ask_price` | Best ask price |
+| `maher_stock_bid_quantity` | Bid quantity at depth |
+| `maher_stock_ask_quantity` | Ask quantity at depth |
+| `maher_stock_spread` | Bid-ask spread |
+
+### Exporter Health Metrics (labels: `exchange`)
+
+| Metric | Description |
+|--------|-------------|
+| `maher_exchange_scrape_success` | 1 if ticks are flowing |
+| `maher_exchange_up` | 1 if exporter is running |
+| `maher_exchange_instruments_active` | Count of active instruments |
+| `maher_exporter_cache_build_time_seconds` | Time to rebuild metrics cache |
+
+### PromQL Examples
+
+```promql
+# Current price of Reliance
+maher_stock_price_current{symbol="RELIANCE", exchange="NSE"}
+
+# Top 10 stocks by volume
+topk(10, maher_stock_volume_total{exchange="NSE"})
+
+# Stocks with > 2% change
+maher_stock_price_change_percent{exchange="NSE"} > 2
+
+# Average spread across all stocks
+avg(maher_stock_spread{exchange="NSE"})
+
+# Instruments currently active
+maher_exchange_instruments_active{exchange="NSE"}
+```
+
+---
+
+## Architecture
+
+```
+┌─────────────────┐
+│ Kite WebSocket   │  (or REST / Tadawul client)
+│ OnTick callback  │
+└────────┬────────┘
+         │ non-blocking enqueue
+         ▼
+┌─────────────────────────┐
+│  Channel-backed          │
+│  Ring Buffer (128K cap)  │
+└────────┬────────────────┘
+         │ batch dequeue (256 ticks)
+         ▼
+┌─────────────────────────┐
+│  Ingestion Worker Pool   │  N = NumCPU goroutines
+└────────┬────────────────┘
+         │ O(1) per-slot mutex write
+         ▼
+┌─────────────────────────┐
+│  FastTickStore            │  pre-allocated []TickData flat slice
+│  (per-slot mutex +        │  zero GC, cache-line friendly
+│   atomic versioning)      │
+└────────┬────────────────┘
+         │
+    ┌────┴────┐
+    ▼         ▼
+ Design A   Design B
+ MetricsCache  Parallel Collect
+ (background   (live fan-out
+  pre-build)    per scrape)
+    │         │
+    ▼         ▼
+  /metrics HTTP handler
+```
+
+See [design.md](design.md) for full architecture documentation including three design alternatives with benchmarks.
+
+---
+
+## Project Structure
+
+```
+stock_exporter/
+├── cmd/
+│   ├── main.go           # Cobra root command + config init
+│   ├── serve.go          # serve subcommand (HTTP server)
+│   ├── bench.go          # bench subcommand (perf benchmark)
+│   ├── validate.go       # validate subcommand
+│   └── version.go        # version subcommand
+├── collector/
+│   ├── collector.go      # Original Prometheus collector (TickStore-based)
+│   ├── fast_collector.go # Design B: parallel Collect() with FastTickStore
+│   ├── metrics_cache.go  # Design A: pre-computed metrics cache
+│   └── stock.go          # REST polling scraper
+├── config/
+│   └── config.go         # YAML + env var configuration
+├── internal/client/
+│   ├── fast_tick_store.go # Pre-allocated flat-slice tick store
+│   ├── ring_buffer.go     # Channel-backed MPMC ring buffer
+│   ├── ingestion_pool.go  # Worker pool (ring buffer → store)
+│   ├── kite.go            # Kite WebSocket ticker client
+│   ├── instruments.go     # Instrument token resolver
+│   ├── stock_client.go    # Generic REST stock client
+│   ├── tadawul_client.go  # Tadawul-specific client
+│   ├── token_manager.go   # Kite access token refresh manager
+│   └── tick_store.go      # Original mutex-based tick store
+├── config.yaml            # NSE configuration
+├── config.tadawul.yaml    # Tadawul configuration
+├── design.md              # Architecture & design document
+├── plan.md                # Execution plan
+├── Dockerfile             # Multi-stage distroless build
+├── Makefile               # Build/test/docker targets
+└── go.mod
+```
+
+---
+
+## Makefile Targets
+
+```bash
+make build       # Compile binary
+make run         # Build + run with config.yaml
+make test        # Run tests with race detector
+make fmt         # Format code
+make vet         # Run go vet
+make lint        # Run golangci-lint
+make tidy        # go mod tidy
+make clean       # Remove build artifacts
+make docker      # Build Docker image
+make docker-run  # Run Docker container
+make help        # Show all targets
+```
+
+---
 
 ## Contributing
-Contributions are welcome! Please open an issue or submit a pull request for any enhancements or bug fixes.
+
+Contributions are welcome. Please open an issue or submit a pull request.
+
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/my-feature`)
+3. Commit changes (`git commit -am 'Add feature'`)
+4. Push (`git push origin feature/my-feature`)
+5. Open a Pull Request
+
+---
 
 ## License
-This project is licensed under the MIT License. See the LICENSE file for more details.
+
+This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.

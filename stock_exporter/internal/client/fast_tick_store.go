@@ -18,9 +18,10 @@ type FastTickStore struct {
 	versions []atomic.Uint64 // per-slot update counter
 	symbols  []string        // per-slot symbol name (set once at init)
 	active   []atomic.Bool   // whether slot has been written to at least once
+	slotMu   []sync.Mutex    // per-slot mutex for fine-grained write locking
 
 	indexMap map[uint32]int // token → slot index (read-only after init)
-	mu       sync.RWMutex   // guards snapshot reads; writes are per-slot
+	mu       sync.RWMutex   // guards snapshot reads and RegisterToken
 
 	count    atomic.Int32 // number of distinct instruments seen
 	capacity int          // max instruments
@@ -34,6 +35,7 @@ func NewFastTickStore(maxInstruments int) *FastTickStore {
 		versions: make([]atomic.Uint64, maxInstruments),
 		symbols:  make([]string, maxInstruments),
 		active:   make([]atomic.Bool, maxInstruments),
+		slotMu:   make([]sync.Mutex, maxInstruments),
 		indexMap: make(map[uint32]int, maxInstruments),
 		capacity: maxInstruments,
 	}
@@ -91,27 +93,25 @@ func (fs *FastTickStore) Update(td *TickData) {
 		}
 	}
 
-	// Copy tick data into the pre-allocated slot
-	slot := &fs.ticks[idx]
-
 	// Attach symbol if not set in the incoming tick
 	if td.Symbol == "" {
 		td.Symbol = fs.symbols[idx]
 	}
 	td.ReceivedAt = time.Now()
 
-	// Direct struct copy — no allocation. The slot is owned by this index
-	// and concurrent readers use snapshot or version checks.
-	fs.mu.RLock()
-	*slot = *td
-	fs.mu.RUnlock()
+	// Per-slot mutex: protects this slot from concurrent writes while
+	// allowing other slots to be written in parallel. Snapshot readers
+	// acquire the global RLock which does not conflict with slot mutexes.
+	fs.slotMu[idx].Lock()
+	fs.ticks[idx] = *td
+	fs.slotMu[idx].Unlock()
 
 	// Bump version for this slot (lock-free)
 	fs.versions[idx].Add(1)
 
-	// Track first-time activation
-	if !fs.active[idx].Load() {
-		fs.active[idx].Store(true)
+	// Track first-time activation — CAS ensures exactly one goroutine
+	// increments the count for this slot.
+	if fs.active[idx].CompareAndSwap(false, true) {
 		fs.count.Add(1)
 	}
 }
@@ -123,9 +123,9 @@ func (fs *FastTickStore) Get(token uint32) (*TickData, bool) {
 		return nil, false
 	}
 
-	fs.mu.RLock()
-	td := fs.ticks[idx] // copy
-	fs.mu.RUnlock()
+	fs.slotMu[idx].Lock()
+	td := fs.ticks[idx] // copy under slot lock
+	fs.slotMu[idx].Unlock()
 
 	return &td, true
 }
@@ -133,9 +133,6 @@ func (fs *FastTickStore) Get(token uint32) (*TickData, bool) {
 // Snapshot returns a contiguous copy of all active ticks. The returned slice
 // is safe for the caller to iterate without holding any locks.
 func (fs *FastTickStore) Snapshot() []TickData {
-	fs.mu.RLock()
-	defer fs.mu.RUnlock()
-
 	n := int(fs.count.Load())
 	out := make([]TickData, 0, n)
 
@@ -143,7 +140,9 @@ func (fs *FastTickStore) Snapshot() []TickData {
 		if !fs.active[i].Load() {
 			continue
 		}
+		fs.slotMu[i].Lock()
 		td := fs.ticks[i]
+		fs.slotMu[i].Unlock()
 		if td.Symbol == "" {
 			td.Symbol = fs.symbols[i]
 		}
@@ -155,15 +154,14 @@ func (fs *FastTickStore) Snapshot() []TickData {
 // SnapshotInto fills a pre-allocated slice with active ticks, avoiding
 // allocation on the hot path. Returns the number of ticks written.
 func (fs *FastTickStore) SnapshotInto(buf []TickData) int {
-	fs.mu.RLock()
-	defer fs.mu.RUnlock()
-
 	n := 0
 	for i := 0; i < fs.capacity && n < len(buf); i++ {
 		if !fs.active[i].Load() {
 			continue
 		}
+		fs.slotMu[i].Lock()
 		buf[n] = fs.ticks[i]
+		fs.slotMu[i].Unlock()
 		if buf[n].Symbol == "" {
 			buf[n].Symbol = fs.symbols[i]
 		}
