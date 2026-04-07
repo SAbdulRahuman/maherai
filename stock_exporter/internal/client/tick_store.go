@@ -14,18 +14,18 @@ type TickData struct {
 	Currency        string
 
 	// Price
-	LastPrice    float64
-	OpenPrice    float64
-	HighPrice    float64
-	LowPrice     float64
-	ClosePrice   float64 // previous close
+	LastPrice     float64
+	OpenPrice     float64
+	HighPrice     float64
+	LowPrice      float64
+	ClosePrice    float64 // previous close
 	ChangePercent float64
 
 	// Volume
-	VolumeTraded     uint32
-	TotalBuyQuantity uint32
+	VolumeTraded      uint32
+	TotalBuyQuantity  uint32
 	TotalSellQuantity uint32
-	LastTradedQty    uint32
+	LastTradedQty     uint32
 	AverageTradePrice float64
 
 	// Order book depth (best bid/ask only for now)
@@ -35,9 +35,9 @@ type TickData struct {
 	AskQty   uint32
 
 	// Timestamps
-	LastTradeTime    time.Time
-	ExchangeTime     time.Time
-	ReceivedAt       time.Time
+	LastTradeTime time.Time
+	ExchangeTime  time.Time
+	ReceivedAt    time.Time
 }
 
 // TickStore is a thread-safe in-memory store holding the latest tick for each

@@ -11,22 +11,22 @@ import (
 
 // StockData holds the market data for a single stock symbol.
 type StockData struct {
-	Symbol        string  `json:"symbol"`
-	Exchange      string  `json:"exchange"`
-	Currency      string  `json:"currency"`
-	CurrentPrice  float64 `json:"current_price"`
-	OpenPrice     float64 `json:"open_price"`
-	HighPrice     float64 `json:"high_price"`
-	LowPrice      float64 `json:"low_price"`
-	PrevClose     float64 `json:"prev_close"`
-	ChangePercent float64 `json:"change_percent"`
-	Volume        float64 `json:"volume"`
-	BuyVolume     float64 `json:"buy_volume"`
-	SellVolume    float64 `json:"sell_volume"`
-	BidPrice      float64 `json:"bid_price"`
-	AskPrice      float64 `json:"ask_price"`
-	BidQty        float64 `json:"bid_qty"`
-	AskQty        float64 `json:"ask_qty"`
+	Symbol        string    `json:"symbol"`
+	Exchange      string    `json:"exchange"`
+	Currency      string    `json:"currency"`
+	CurrentPrice  float64   `json:"current_price"`
+	OpenPrice     float64   `json:"open_price"`
+	HighPrice     float64   `json:"high_price"`
+	LowPrice      float64   `json:"low_price"`
+	PrevClose     float64   `json:"prev_close"`
+	ChangePercent float64   `json:"change_percent"`
+	Volume        float64   `json:"volume"`
+	BuyVolume     float64   `json:"buy_volume"`
+	SellVolume    float64   `json:"sell_volume"`
+	BidPrice      float64   `json:"bid_price"`
+	AskPrice      float64   `json:"ask_price"`
+	BidQty        float64   `json:"bid_qty"`
+	AskQty        float64   `json:"ask_qty"`
 	Timestamp     time.Time `json:"timestamp"`
 }
 

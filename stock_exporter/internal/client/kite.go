@@ -11,13 +11,14 @@ import (
 // KiteTickerClient wraps the Zerodha Kite WebSocket ticker and feeds
 // incoming ticks into a TickStore for the Prometheus collector to read.
 type KiteTickerClient struct {
-	ticker   *kiteticker.Ticker
-	store    *TickStore
-	tokens   []uint32
-	exchange string
-	currency string
-	mode     string // "ltp", "quote", "full"
-	logger   *slog.Logger
+	ticker      *kiteticker.Ticker
+	store       *TickStore
+	tokens      []uint32
+	exchange    string
+	currency    string
+	mode        string // "ltp", "quote", "full"
+	logger      *slog.Logger
+	tickHandler func(*TickData) // optional override for tick routing
 }
 
 // KiteTickerConfig holds the parameters needed to create a KiteTickerClient.
@@ -82,6 +83,13 @@ func (k *KiteTickerClient) Stop() {
 	k.ticker.Close()
 }
 
+// SetTickHandler overrides the default OnTick behaviour. Instead of writing
+// to the TickStore directly, the supplied function is called with each
+// converted TickData. Use this to route ticks through a RingBuffer.
+func (k *KiteTickerClient) SetTickHandler(fn func(*TickData)) {
+	k.tickHandler = fn
+}
+
 // ─── Callbacks ──────────────────────────────────────────────────────────────
 
 func (k *KiteTickerClient) onConnect() {
@@ -103,7 +111,15 @@ func (k *KiteTickerClient) onConnect() {
 
 func (k *KiteTickerClient) onTick(tick kitemodels.Tick) {
 	td := k.tickToData(tick)
-	k.store.Update(td)
+
+	// Route tick: custom handler takes priority, then fallback to TickStore.
+	if k.tickHandler != nil {
+		k.tickHandler(td)
+		return
+	}
+	if k.store != nil {
+		k.store.Update(td)
+	}
 }
 
 func (k *KiteTickerClient) onError(err error) {

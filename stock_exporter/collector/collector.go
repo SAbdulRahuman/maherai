@@ -28,11 +28,11 @@ type StockCollector struct {
 	priceChangePercentDesc *prometheus.Desc
 
 	// ─── Volume metrics ───
-	volumeTotalDesc    *prometheus.Desc
-	volumeBuyDesc      *prometheus.Desc
-	volumeSellDesc     *prometheus.Desc
-	lastTradedQtyDesc  *prometheus.Desc
-	avgTradePriceDesc  *prometheus.Desc
+	volumeTotalDesc   *prometheus.Desc
+	volumeBuyDesc     *prometheus.Desc
+	volumeSellDesc    *prometheus.Desc
+	lastTradedQtyDesc *prometheus.Desc
+	avgTradePriceDesc *prometheus.Desc
 
 	// ─── Order book metrics ───
 	bidPriceDesc *prometheus.Desc
@@ -42,8 +42,8 @@ type StockCollector struct {
 	spreadDesc   *prometheus.Desc
 
 	// ─── Exporter-level metrics ───
-	scrapeSuccessDesc    *prometheus.Desc
-	upDesc               *prometheus.Desc
+	scrapeSuccessDesc     *prometheus.Desc
+	upDesc                *prometheus.Desc
 	instrumentsActiveDesc *prometheus.Desc
 }
 
@@ -80,8 +80,8 @@ func NewStockCollector(store *client.TickStore, exchange string, logger *slog.Lo
 		spreadDesc:   prometheus.NewDesc("maher_stock_spread", "Bid-ask spread", []string{"symbol", "exchange"}, nil),
 
 		// Exporter health
-		scrapeSuccessDesc:    prometheus.NewDesc("maher_exchange_scrape_success", "Whether ticks are being received (1=yes, 0=no)", []string{"exchange"}, nil),
-		upDesc:               prometheus.NewDesc("maher_exchange_up", "Whether the exporter is up", []string{"exchange"}, nil),
+		scrapeSuccessDesc:     prometheus.NewDesc("maher_exchange_scrape_success", "Whether ticks are being received (1=yes, 0=no)", []string{"exchange"}, nil),
+		upDesc:                prometheus.NewDesc("maher_exchange_up", "Whether the exporter is up", []string{"exchange"}, nil),
 		instrumentsActiveDesc: prometheus.NewDesc("maher_exchange_instruments_active", "Number of instruments with live tick data", []string{"exchange"}, nil),
 	}
 }

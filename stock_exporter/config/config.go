@@ -36,13 +36,13 @@ type Config struct {
 
 // KiteConfig holds Zerodha Kite Connect credentials and ticker settings.
 type KiteConfig struct {
-	APIKey       string        `yaml:"api_key"`
-	APISecret    string        `yaml:"api_secret"`
-	AccessToken  string        `yaml:"access_token"`
-	RequestToken string        `yaml:"request_token"`
-	TickerMode   string        `yaml:"ticker_mode"`   // "ltp", "quote", "full" (default: "full")
-	Currency     string        `yaml:"currency"`       // default: "INR"
-	MaxReconnect int           `yaml:"max_reconnect_attempts"`
+	APIKey            string        `yaml:"api_key"`
+	APISecret         string        `yaml:"api_secret"`
+	AccessToken       string        `yaml:"access_token"`
+	RequestToken      string        `yaml:"request_token"`
+	TickerMode        string        `yaml:"ticker_mode"` // "ltp", "quote", "full" (default: "full")
+	Currency          string        `yaml:"currency"`    // default: "INR"
+	MaxReconnect      int           `yaml:"max_reconnect_attempts"`
 	ReconnectInterval time.Duration `yaml:"reconnect_interval"`
 }
 

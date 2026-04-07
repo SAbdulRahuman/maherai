@@ -20,7 +20,7 @@ all: fmt vet build
 
 ## build: Compile the binary
 build:
-	CGO_ENABLED=0 go build -ldflags '$(LDFLAGS)' -o $(BINARY_NAME) ./cmd/main.go
+	CGO_ENABLED=0 go build -ldflags '$(LDFLAGS)' -o $(BINARY_NAME) ./cmd/
 
 ## run: Build and run with default config
 run: build
