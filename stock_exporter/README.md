@@ -12,25 +12,6 @@ Kite WebSocket → OnTick → TickStore (sync.RWMutex) → StockCollector → /m
 - Implements the Prometheus Collector interface for easy integration.
 - Configurable through environment variables and configuration files.
 
-## Project Structure
-```
-stock_exporter
-├── cmd
-│   └── main.go          # Entry point of the application
-├── collector
-│   ├── collector.go     # Defines the Collector struct
-│   └── stock.go         # Logic for collecting stock metrics
-├── config
-│   └── config.go        # Configuration structure and loading methods
-├── internal
-│   └── client
-│       └── stock_client.go # Responsible for API calls to fetch stock data
-├── go.mod                # Module dependencies
-├── go.sum                # Checksums for module dependencies
-├── Makefile              # Build instructions and commands
-├── Dockerfile            # Instructions for building a Docker image
-└── README.md             # Project documentation
-```
 
 ## Installation
 To install the Stock Exporter, clone the repository and run the following commands:

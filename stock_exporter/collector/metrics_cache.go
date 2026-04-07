@@ -195,6 +195,14 @@ func (mc *MetricsCache) writeMetrics(buf *bytes.Buffer, ticks []client.TickData)
 		fmt.Fprintf(buf, "maher_exporter_cache_build_time_seconds{exchange=%q} %g\n", exchange, resp.BuildTime.Seconds())
 	}
 
+	writeHeader(buf, "maher_exchange_scrape_duration_seconds", "gauge", "Time taken to collect all metrics")
+	if resp != nil {
+		fmt.Fprintf(buf, "maher_exchange_scrape_duration_seconds{exchange=%q} %g\n", exchange, resp.BuildTime.Seconds())
+	}
+
+	writeHeader(buf, "maher_exchange_scrape_errors_total", "counter", "Total number of scrape errors")
+	fmt.Fprintf(buf, "maher_exchange_scrape_errors_total{exchange=%q} 0\n", exchange)
+
 	if len(ticks) == 0 {
 		return
 	}

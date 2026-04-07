@@ -124,6 +124,30 @@ func runServe(cmd *cobra.Command, args []string) error {
 
 		go kiteTicker.Serve()
 
+		// ─── Token Expiry Monitor (0.1.9) ────────────────
+		tokenMgr := client.NewTokenManager(client.TokenManagerConfig{
+			APIKey:      cfg.Kite.APIKey,
+			APISecret:   cfg.Kite.APISecret,
+			AccessToken: cfg.Kite.AccessToken,
+			Logger:      logger,
+		})
+		tokenMgr.Start(ctx)
+
+	} else if cfg.Exchange == "TADAWUL" {
+		// ─── Tadawul-specific data source (Phase 1.2) ────
+		logger.Info("Tadawul exchange detected — using Tadawul client")
+
+		tc := client.NewTadawulClient(
+			cfg.StockAPIURL,
+			cfg.APIKey,
+			cfg.APISecret,
+			cfg.ScrapeTimeout,
+			logger,
+		)
+
+		tadawulScraper := client.NewTadawulScraper(tc, cfg.Symbols, cfg.ScrapeInterval, ringBuf, logger)
+		go tadawulScraper.Run(ctx)
+
 	} else {
 		logger.Warn("Kite Connect not configured — running with REST polling fallback")
 
