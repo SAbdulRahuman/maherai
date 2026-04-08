@@ -17,7 +17,7 @@ export default function TickerStrip({ ticks }: TickerStripProps) {
           return (
             <div
               key={tick.symbol}
-              className="flex items-center gap-2 px-3 py-1 whitespace-nowrap text-xs border-r border-slate-800 last:border-r-0 min-w-fit"
+              className="flex items-center gap-2 px-3 py-1.5 whitespace-nowrap text-sm border-r border-slate-800 last:border-r-0 min-w-fit"
             >
               <span className="font-medium text-slate-300">{tick.symbol}</span>
               <span className="text-slate-200 font-mono">

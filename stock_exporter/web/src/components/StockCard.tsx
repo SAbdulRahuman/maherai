@@ -13,9 +13,9 @@ export default function StockCard({ tick }: StockCardProps) {
   return (
     <div className="bg-slate-900 border border-slate-700 rounded-xl p-4 hover:border-slate-600 transition-colors">
       <div className="flex items-center justify-between mb-3">
-        <h3 className="font-bold text-sm text-slate-200">{tick.symbol}</h3>
+        <h3 className="font-bold text-base text-slate-200">{tick.symbol}</h3>
         <span
-          className={`text-xs font-medium px-2 py-0.5 rounded-full ${
+          className={`text-sm font-medium px-2 py-0.5 rounded-full ${
             isUp
               ? "bg-green-900/50 text-green-400"
               : "bg-red-900/50 text-red-400"
@@ -30,7 +30,7 @@ export default function StockCard({ tick }: StockCardProps) {
         {currency}{tick.last_price.toFixed(2)}
       </div>
 
-      <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-xs">
+      <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
         <Row label="Open" value={`${currency}${tick.open_price.toFixed(2)}`} />
         <Row label="High" value={`${currency}${tick.high_price.toFixed(2)}`} />
         <Row label="Low" value={`${currency}${tick.low_price.toFixed(2)}`} />

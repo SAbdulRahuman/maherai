@@ -69,11 +69,11 @@ export default function ConfigPage() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-slate-100">Configuration</h1>
+        <h1 className="text-3xl font-bold text-slate-100">Configuration</h1>
         <button
           onClick={handleSave}
           disabled={saving}
-          className="px-4 py-2 bg-sky-600 hover:bg-sky-500 disabled:bg-slate-600 text-white rounded-lg text-sm font-medium transition-colors"
+          className="px-4 py-2 bg-sky-600 hover:bg-sky-500 disabled:bg-slate-600 text-white rounded-lg text-base font-medium transition-colors"
         >
           {saving ? "Saving..." : "Save Configuration"}
         </button>
@@ -81,7 +81,7 @@ export default function ConfigPage() {
 
       {message && (
         <div
-          className={`px-4 py-3 rounded-lg text-sm ${
+          className={`px-4 py-3 rounded-lg text-base ${
             message.type === "success"
               ? "bg-green-900/50 text-green-300 border border-green-800"
               : "bg-red-900/50 text-red-300 border border-red-800"
@@ -126,38 +126,26 @@ export default function ConfigPage() {
 
       {/* Kite Connect Settings */}
       <Section title="Kite Connect Settings">
-        <Field label="API Key">
-          <input
-            type="text"
-            value={config.kite.api_key}
-            onChange={(e) => updateKite("api_key", e.target.value)}
-            className="input-field"
-          />
-        </Field>
-        <Field label="API Secret">
-          <input
-            type="password"
-            value={config.kite.api_secret}
-            onChange={(e) => updateKite("api_secret", e.target.value)}
-            className="input-field"
-          />
-        </Field>
-        <Field label="Access Token">
-          <input
-            type="password"
-            value={config.kite.access_token}
-            onChange={(e) => updateKite("access_token", e.target.value)}
-            className="input-field"
-          />
-        </Field>
-        <Field label="Request Token">
-          <input
-            type="password"
-            value={config.kite.request_token}
-            onChange={(e) => updateKite("request_token", e.target.value)}
-            className="input-field"
-          />
-        </Field>
+        <SecretField
+          label="API Key"
+          value={config.kite.api_key}
+          onChange={(v) => updateKite("api_key", v)}
+        />
+        <SecretField
+          label="API Secret"
+          value={config.kite.api_secret}
+          onChange={(v) => updateKite("api_secret", v)}
+        />
+        <SecretField
+          label="Access Token"
+          value={config.kite.access_token}
+          onChange={(v) => updateKite("access_token", v)}
+        />
+        <SecretField
+          label="Request Token"
+          value={config.kite.request_token}
+          onChange={(v) => updateKite("request_token", v)}
+        />
         <Field label="Ticker Mode">
           <select
             value={config.kite.ticker_mode}
@@ -183,7 +171,7 @@ export default function ConfigPage() {
             type="number"
             value={config.kite.max_reconnect_attempts}
             onChange={(e) =>
-              updateKite("max_reconnect_attempts", parseInt(e.target.value) || 0)
+              updateKite("max_reconnect_attempts", Number.parseInt(e.target.value) || 0)
             }
             className="input-field"
           />
@@ -209,22 +197,16 @@ export default function ConfigPage() {
             className="input-field"
           />
         </Field>
-        <Field label="API Key">
-          <input
-            type="text"
-            value={config.api_key}
-            onChange={(e) => updateField("api_key", e.target.value)}
-            className="input-field"
-          />
-        </Field>
-        <Field label="API Secret">
-          <input
-            type="password"
-            value={config.api_secret}
-            onChange={(e) => updateField("api_secret", e.target.value)}
-            className="input-field"
-          />
-        </Field>
+        <SecretField
+          label="API Key"
+          value={config.api_key}
+          onChange={(v) => updateField("api_key", v)}
+        />
+        <SecretField
+          label="API Secret"
+          value={config.api_secret}
+          onChange={(v) => updateField("api_secret", v)}
+        />
       </Section>
 
       {/* Scrape Settings */}
@@ -251,7 +233,7 @@ export default function ConfigPage() {
 
       {/* Symbols Watchlist */}
       <Section title="Symbols Watchlist">
-        <p className="text-xs text-slate-400 mb-2">
+        <p className="text-sm text-slate-400 mb-2">
           One symbol per line. Total: {config.symbols.length} symbols.
         </p>
         <textarea
@@ -266,7 +248,7 @@ export default function ConfigPage() {
             )
           }
           rows={12}
-          className="input-field font-mono text-xs"
+          className="input-field font-mono text-sm"
           placeholder={"INFY\nWIPRO\nTCS\n..."}
         />
       </Section>
@@ -276,7 +258,7 @@ export default function ConfigPage() {
         <button
           onClick={handleSave}
           disabled={saving}
-          className="px-6 py-2.5 bg-sky-600 hover:bg-sky-500 disabled:bg-slate-600 text-white rounded-lg text-sm font-medium transition-colors"
+          className="px-6 py-2.5 bg-sky-600 hover:bg-sky-500 disabled:bg-slate-600 text-white rounded-lg text-base font-medium transition-colors"
         >
           {saving ? "Saving..." : "Save Configuration"}
         </button>
@@ -288,13 +270,13 @@ export default function ConfigPage() {
 function Section({
   title,
   children,
-}: {
+}: Readonly<{
   title: string;
   children: React.ReactNode;
-}) {
+}>) {
   return (
     <div className="bg-slate-900 border border-slate-700 rounded-xl p-6">
-      <h2 className="text-lg font-semibold text-slate-200 mb-4 pb-2 border-b border-slate-700">
+      <h2 className="text-xl font-semibold text-slate-200 mb-4 pb-2 border-b border-slate-700">
         {title}
       </h2>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">{children}</div>
@@ -305,14 +287,73 @@ function Section({
 function Field({
   label,
   children,
-}: {
+}: Readonly<{
   label: string;
   children: React.ReactNode;
-}) {
+}>) {
   return (
     <div className="space-y-1.5">
-      <label className="block text-sm font-medium text-slate-400">{label}</label>
+      <label className="block text-base font-medium text-slate-400">{label}</label>
       {children}
     </div>
+  );
+}
+
+function maskValue(v: string): string {
+  if (v.length <= 4) return "•".repeat(v.length);
+  return "•".repeat(v.length - 4) + v.slice(-4);
+}
+
+function SecretField({
+  label,
+  value,
+  onChange,
+}: Readonly<{
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+}>) {
+  const [visible, setVisible] = useState(false);
+
+  return (
+    <Field label={label}>
+      <div className="relative">
+        {visible ? (
+          <input
+            type="text"
+            value={value}
+            onChange={(e) => onChange(e.target.value)}
+            className="input-field pr-10"
+            autoComplete="off"
+            data-1p-ignore
+            data-lpignore="true"
+          />
+        ) : (
+          <div
+            className="input-field pr-10 cursor-text select-none overflow-hidden whitespace-nowrap text-slate-400 tracking-wider"
+            onClick={() => setVisible(true)}
+          >
+            {value ? maskValue(value) : <span className="text-slate-600">••••••••</span>}
+          </div>
+        )}
+        <button
+          type="button"
+          onClick={() => setVisible((v) => !v)}
+          className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-slate-200 transition-colors"
+          title={visible ? "Hide" : "Show"}
+        >
+          {visible ? (
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M13.875 18.825A10.05 10.05 0 0112 19c-5 0-9.27-3.11-11-7.5a11.72 11.72 0 013.168-4.477M6.343 6.343A9.97 9.97 0 0112 5c5 0 9.27 3.11 11 7.5a11.7 11.7 0 01-4.373 5.157M6.343 6.343L3 3m3.343 3.343l2.829 2.829m4.486 4.486l2.829 2.829M6.343 6.343l11.314 11.314M14.121 14.121A3 3 0 009.879 9.879" />
+            </svg>
+          ) : (
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+              <path strokeLinecap="round" strokeLinejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+            </svg>
+          )}
+        </button>
+      </div>
+    </Field>
   );
 }

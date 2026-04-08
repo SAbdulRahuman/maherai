@@ -59,69 +59,109 @@ curl http://localhost:9101/metrics
 
 ---
 
-## Real-Time Testing (Kite Connect WebSocket)
+## Generate Kite Connect Access Token
 
-Follow these steps to test the exporter with **live market data** from Zerodha Kite Connect.
+Access tokens **expire daily at 6:00 AM IST** — you must repeat this process each trading day.
 
-### 1. Obtain a Request Token
+### Prerequisites
 
-Kite Connect uses an OAuth2 login flow. Open this URL in your browser:
+You need a [Kite Connect](https://developers.kite.trade/) developer account with:
+- **API Key** — your app's public identifier
+- **API Secret** — your app's private secret (never share this)
+
+### Step 1: Obtain a Request Token
+
+Kite Connect uses an OAuth2 login flow. Open this URL in your browser (replace `YOUR_API_KEY` with your actual key):
 
 ```
-https://kite.zerodha.com/connect/login?v=3&api_key=kv8i33fc2z8qn1vr
+https://kite.zerodha.com/connect/login?v=3&api_key=YOUR_API_KEY
 ```
 
 1. Log in with your Zerodha credentials (client ID + password + 2FA).
-2. After login, you will be redirected to your registered redirect URL with a `request_token` query parameter, e.g.:
+2. After login, you will be redirected to your registered redirect URL with a `request_token` query parameter:
    ```
-   http://localhost:8080/callback?type=login&status=success&request_token=1z3UVoE718W034ihT2xts4mkpq8HLyQA&action=login
+   http://localhost:8080/callback?type=login&status=success&request_token=YOUR_REQUEST_TOKEN&action=login
    ```
-3. Copy the `request_token` value from the URL (e.g. `1z3UVoE718W034ihT2xts4mkpq8HLyQA`).
+3. Copy the `request_token` value from the URL.
 
-### 2. Generate an Access Token
+> **Note:** Request tokens are single-use and expire within a few minutes. Use it immediately.
 
-Use the request token to generate an access token. You can either:
+### Step 2: Exchange Request Token for Access Token
 
-**Option A — Use the exporter directly (if token manager is enabled):**
-
-Set the request token in `config.yaml` or via env var:
+The access token is obtained by sending your API key, request token, and a SHA-256 checksum of all three credentials to the Kite API.
 
 ```bash
-export KITE_API_KEY="kv8i33fc2z8qn1vr"
-export KITE_API_SECRET="7vaohfg02o75ahnsxvpgv62o7aj5lib6"
-export KITE_REQUEST_TOKEN="1z3UVoE718W034ihT2xts4mkpq8HLyQA"
-```
+# Set your credentials
+API_KEY="YOUR_API_KEY"
+API_SECRET="YOUR_API_SECRET"
+REQUEST_TOKEN="PASTE_REQUEST_TOKEN_HERE"
 
-**Option B — Use curl to exchange the request token:**
+# Generate checksum (SHA-256 of api_key + request_token + api_secret)
+CHECKSUM=$(echo -n "${API_KEY}${REQUEST_TOKEN}${API_SECRET}" | sha256sum | cut -d' ' -f1)
 
-```bash
+# Exchange for access token
 curl -X POST https://api.kite.trade/session/token \
-  -d "api_key=kv8i33fc2z8qn1vr" \
-  -d "request_token=1z3UVoE718W034ihT2xts4mkpq8HLyQA" \
-  -d "checksum=$(echo -n 'kv8i33fc2z8qn1vr1z3UVoE718W034ihT2xts4mkpq8HLyQA7vaohfg02o75ahnsxvpgv62o7aj5lib6' | sha256sum | cut -d' ' -f1)"
+  -d "api_key=${API_KEY}" \
+  -d "request_token=${REQUEST_TOKEN}" \
+  -d "checksum=${CHECKSUM}"
 ```
 
-The response will contain an `access_token`. Copy it.
+The JSON response will contain your `access_token`:
 
-### 3. Configure & Start the Exporter
+```json
+{
+  "status": "success",
+  "data": {
+    "user_id": "AB1234",
+    "access_token": "your_new_access_token_here",
+    "refresh_token": "",
+    "user_type": "individual",
+    "broker": "ZERODHA",
+    ...
+  }
+}
+```
 
-Set the access token in `config.yaml` or via env var:
+Copy the `access_token` value from the response.
+
+**Alternatively**, if you set `KITE_REQUEST_TOKEN` in your environment, the exporter's built-in **token manager** will exchange it automatically on startup — no manual curl needed.
+
+### Step 3: Configure the Exporter
+
+**Option A — Environment variables** (recommended for security):
 
 ```bash
-export KITE_ACCESS_TOKEN="n527j5cdnpHl5zJ0vRT6eHIA5NtBF3k5"
+export KITE_API_KEY="YOUR_API_KEY"
+export KITE_API_SECRET="YOUR_API_SECRET"
+export KITE_ACCESS_TOKEN="YOUR_ACCESS_TOKEN"
 ```
 
-Or edit `config.yaml`:
+Add these to your `~/.bashrc` for persistence:
+
+```bash
+cat >> ~/.bashrc << 'EOF'
+# ─── Stock Exporter: Kite Connect Credentials ────────────
+export KITE_API_KEY="YOUR_API_KEY"
+export KITE_API_SECRET="YOUR_API_SECRET"
+export KITE_ACCESS_TOKEN="YOUR_ACCESS_TOKEN"
+export KITE_TICKER_MODE="full"
+EOF
+source ~/.bashrc
+```
+
+**Option B — Config file** (`config.yaml`):
 
 ```yaml
 kite:
-  api_key: "kv8i33fc2z8qn1vr"
-  api_secret: "7vaohfg02o75ahnsxvpgv62o7aj5lib6"
-  access_token: "n527j5cdnpHl5zJ0vRT6eHIA5NtBF3k5"
+  api_key: "YOUR_API_KEY"
+  api_secret: "YOUR_API_SECRET"
+  access_token: "YOUR_ACCESS_TOKEN"
   ticker_mode: "full"
 ```
 
-Then build and run:
+> **Security:** Prefer environment variables over config file to avoid committing secrets to version control.
+
+### Step 4: Start the Exporter
 
 ```bash
 make build

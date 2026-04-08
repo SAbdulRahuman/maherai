@@ -23,7 +23,7 @@ export default function StatusBadge() {
 
   if (!status) {
     return (
-      <span className="inline-flex items-center gap-1.5 text-xs px-2 py-1 rounded-full bg-red-900/50 text-red-400">
+      <span className="inline-flex items-center gap-1.5 text-sm px-2.5 py-1 rounded-full bg-red-900/50 text-red-400">
         <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
         Disconnected
       </span>
@@ -32,14 +32,14 @@ export default function StatusBadge() {
 
   return (
     <div className="flex items-center gap-3">
-      <span className="inline-flex items-center gap-1.5 text-xs px-2 py-1 rounded-full bg-green-900/50 text-green-400">
+      <span className="inline-flex items-center gap-1.5 text-sm px-2.5 py-1 rounded-full bg-green-900/50 text-green-400">
         <span className="w-2 h-2 rounded-full bg-green-500" />
         {status.exchange}
       </span>
-      <span className="text-xs text-slate-400">
+      <span className="text-sm text-slate-400">
         {status.instruments} instruments
       </span>
-      <span className="text-xs text-slate-500">v{status.version}</span>
+      <span className="text-sm text-slate-500">v{status.version}</span>
     </div>
   );
 }

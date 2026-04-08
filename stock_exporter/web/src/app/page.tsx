@@ -61,10 +61,10 @@ export default function HomePage() {
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-slate-100">Live Market</h1>
+        <h1 className="text-3xl font-bold text-slate-100">Live Market</h1>
         <div className="flex items-center gap-3">
           <span
-            className={`inline-flex items-center gap-1.5 text-xs px-2 py-1 rounded-full ${
+            className={`inline-flex items-center gap-1.5 text-sm px-2.5 py-1 rounded-full ${
               connected
                 ? "bg-green-900/50 text-green-400"
                 : "bg-yellow-900/50 text-yellow-400"
@@ -89,7 +89,7 @@ export default function HomePage() {
           {selectedSymbols.map((sym) => (
             <span
               key={sym}
-              className="inline-flex items-center gap-1 px-2.5 py-1 bg-sky-900/50 text-sky-300 text-xs rounded-full border border-sky-800"
+              className="inline-flex items-center gap-1 px-3 py-1.5 bg-sky-900/50 text-sky-300 text-sm rounded-full border border-sky-800"
             >
               {sym}
               <button
@@ -107,7 +107,7 @@ export default function HomePage() {
               onChange={(e) => setSearchTerm(e.target.value)}
               onFocus={() => setShowSearch(true)}
               placeholder="Add symbol..."
-              className="w-36 px-3 py-1.5 bg-slate-800 border border-slate-600 rounded-lg text-xs text-slate-200 placeholder-slate-500 focus:border-sky-500 focus:outline-none"
+              className="w-44 px-3 py-1.5 bg-slate-800 border border-slate-600 rounded-lg text-sm text-slate-200 placeholder-slate-500 focus:border-sky-500 focus:outline-none"
             />
             {showSearch && filteredSymbols.length > 0 && (
               <div className="absolute top-full mt-1 left-0 w-48 max-h-48 overflow-y-auto bg-slate-800 border border-slate-600 rounded-lg shadow-xl z-50">
@@ -115,7 +115,7 @@ export default function HomePage() {
                   <button
                     key={sym}
                     onClick={() => addSymbol(sym)}
-                    className="w-full text-left px-3 py-1.5 text-xs text-slate-300 hover:bg-slate-700 hover:text-white"
+                    className="w-full text-left px-3 py-2 text-sm text-slate-300 hover:bg-slate-700 hover:text-white"
                   >
                     {sym}
                   </button>
@@ -126,7 +126,7 @@ export default function HomePage() {
           {showSearch && (
             <button
               onClick={() => { setShowSearch(false); setSearchTerm(""); }}
-              className="text-xs text-slate-500 hover:text-slate-300"
+              className="text-sm text-slate-500 hover:text-slate-300"
             >
               Close
             </button>
@@ -144,7 +144,7 @@ export default function HomePage() {
       {/* Stock Cards Grid */}
       {ticks.length > 0 && (
         <>
-          <h2 className="text-lg font-semibold text-slate-200 mt-8">
+          <h2 className="text-xl font-semibold text-slate-200 mt-8">
             Stock Details
           </h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
