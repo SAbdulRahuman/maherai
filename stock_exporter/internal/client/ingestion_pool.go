@@ -34,7 +34,7 @@ func NewIngestionPool(source BatchDequeuer, sink TickUpdater, numWorkers int, lo
 		sink:       sink,
 		numWorkers: numWorkers,
 		logger:     logger,
-		batchSize:  256,
+		batchSize:  3000,
 	}
 }
 

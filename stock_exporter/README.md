@@ -59,13 +59,249 @@ curl http://localhost:9101/metrics
 
 ---
 
+## Real-Time Testing (Kite Connect WebSocket)
+
+Follow these steps to test the exporter with **live market data** from Zerodha Kite Connect.
+
+### 1. Obtain a Request Token
+
+Kite Connect uses an OAuth2 login flow. Open this URL in your browser:
+
+```
+https://kite.zerodha.com/connect/login?v=3&api_key=kv8i33fc2z8qn1vr
+```
+
+1. Log in with your Zerodha credentials (client ID + password + 2FA).
+2. After login, you will be redirected to your registered redirect URL with a `request_token` query parameter, e.g.:
+   ```
+   http://localhost:8080/callback?type=login&status=success&request_token=1z3UVoE718W034ihT2xts4mkpq8HLyQA&action=login
+   ```
+3. Copy the `request_token` value from the URL (e.g. `1z3UVoE718W034ihT2xts4mkpq8HLyQA`).
+
+### 2. Generate an Access Token
+
+Use the request token to generate an access token. You can either:
+
+**Option A — Use the exporter directly (if token manager is enabled):**
+
+Set the request token in `config.yaml` or via env var:
+
+```bash
+export KITE_API_KEY="kv8i33fc2z8qn1vr"
+export KITE_API_SECRET="7vaohfg02o75ahnsxvpgv62o7aj5lib6"
+export KITE_REQUEST_TOKEN="1z3UVoE718W034ihT2xts4mkpq8HLyQA"
+```
+
+**Option B — Use curl to exchange the request token:**
+
+```bash
+curl -X POST https://api.kite.trade/session/token \
+  -d "api_key=kv8i33fc2z8qn1vr" \
+  -d "request_token=1z3UVoE718W034ihT2xts4mkpq8HLyQA" \
+  -d "checksum=$(echo -n 'kv8i33fc2z8qn1vr1z3UVoE718W034ihT2xts4mkpq8HLyQA7vaohfg02o75ahnsxvpgv62o7aj5lib6' | sha256sum | cut -d' ' -f1)"
+```
+
+The response will contain an `access_token`. Copy it.
+
+### 3. Configure & Start the Exporter
+
+Set the access token in `config.yaml` or via env var:
+
+```bash
+export KITE_ACCESS_TOKEN="n527j5cdnpHl5zJ0vRT6eHIA5NtBF3k5"
+```
+
+Or edit `config.yaml`:
+
+```yaml
+kite:
+  api_key: "kv8i33fc2z8qn1vr"
+  api_secret: "7vaohfg02o75ahnsxvpgv62o7aj5lib6"
+  access_token: "n527j5cdnpHl5zJ0vRT6eHIA5NtBF3k5"
+  ticker_mode: "full"
+```
+
+Then build and run:
+
+```bash
+make build
+./stock_exporter serve --config config.yaml --log-level debug
+```
+
+### 4. Verify Live Data
+
+Once the exporter is running and connected to the Kite WebSocket:
+
+```bash
+# ─── Health & Readiness ───────────────────────────────────
+
+# Check if exporter is up (should return 200 OK)
+curl -s -o /dev/null -w "HTTP Status: %{http_code}\n" http://localhost:9101/health
+
+# Check readiness (200 = ticks are flowing, 503 = not ready yet)
+curl -s -o /dev/null -w "HTTP Status: %{http_code}\n" http://localhost:9101/ready
+
+# ─── Landing Page ─────────────────────────────────────────
+
+# View exporter status page
+curl -s http://localhost:9101/
+
+# ─── Live Stock Prices ────────────────────────────────────
+
+# Get all current stock prices
+curl -s http://localhost:9101/metrics | grep maher_stock_price_current
+
+# Get price for a specific stock (e.g., RELIANCE)
+curl -s http://localhost:9101/metrics | grep 'maher_stock_price_current{symbol="RELIANCE"'
+
+# Get price for TCS
+curl -s http://localhost:9101/metrics | grep 'maher_stock_price_current{symbol="TCS"'
+
+# ─── Volume Data ──────────────────────────────────────────
+
+# Total traded volume for all stocks
+curl -s http://localhost:9101/metrics | grep maher_stock_volume_total
+
+# Volume for a specific stock
+curl -s http://localhost:9101/metrics | grep 'maher_stock_volume_total{symbol="INFY"'
+
+# ─── Order Book / Market Depth ────────────────────────────
+
+# Best bid and ask prices
+curl -s http://localhost:9101/metrics | grep -E 'maher_stock_(bid|ask)_price'
+
+# Bid-ask spread
+curl -s http://localhost:9101/metrics | grep maher_stock_spread
+
+# ─── OHLC Data ────────────────────────────────────────────
+
+# Open, High, Low prices
+curl -s http://localhost:9101/metrics | grep -E 'maher_stock_price_(open|high|low)'
+
+# Previous close and change %
+curl -s http://localhost:9101/metrics | grep -E 'maher_stock_price_(close_prev|change_percent)'
+
+# ─── Exporter Health Metrics ─────────────────────────────
+
+# Check if exchange connection is up
+curl -s http://localhost:9101/metrics | grep maher_exchange_up
+
+# Number of active instruments
+curl -s http://localhost:9101/metrics | grep maher_exchange_instruments_active
+
+# Scrape success status
+curl -s http://localhost:9101/metrics | grep maher_exchange_scrape_success
+
+# Cache build time
+curl -s http://localhost:9101/metrics | grep maher_exporter_cache_build_time_seconds
+
+# ─── Full Metrics Dump ────────────────────────────────────
+
+# Dump all maher_* metrics (pipe to file for analysis)
+curl -s http://localhost:9101/metrics | grep "^maher_"
+
+# Save full metrics snapshot to a file
+curl -s http://localhost:9101/metrics > metrics_snapshot_$(date +%Y%m%d_%H%M%S).txt
+
+# ─── Real-Time Monitoring ─────────────────────────────────
+
+# Watch RELIANCE price update every second
+watch -n 1 'curl -s http://localhost:9101/metrics | grep "maher_stock_price_current{symbol=\"RELIANCE\""'
+
+# Watch all stock prices refresh every 2 seconds
+watch -n 2 'curl -s http://localhost:9101/metrics | grep maher_stock_price_current'
+
+# Monitor bid-ask spread in real time
+watch -n 1 'curl -s http://localhost:9101/metrics | grep maher_stock_spread'
+
+# ─── Quick Summary (one-liner) ────────────────────────────
+
+# Print symbol, price, volume in a table format
+curl -s http://localhost:9101/metrics | grep maher_stock_price_current | \
+  awk -F'[{}" ]' '{for(i=1;i<=NF;i++) if($i~/^symbol=/) print $(i+1), $NF}'
+```
+
+### 5. Test with Prometheus (optional)
+
+Add the exporter as a scrape target in your `prometheus.yml`:
+
+```yaml
+scrape_configs:
+  - job_name: 'stock_exporter'
+    scrape_interval: 5s
+    static_configs:
+      - targets: ['localhost:9101']
+```
+
+Then start Prometheus and query live data:
+
+```promql
+maher_stock_price_current{exchange="NSE"}
+rate(maher_stock_volume_total{symbol="RELIANCE"}[5m])
+```
+
+### Important Notes
+
+- **Access tokens expire daily at 6:00 AM IST.** You must re-authenticate each trading day.
+- **Market hours:** NSE trading is Mon–Fri, 9:15 AM – 3:30 PM IST. Outside these hours, ticks will not flow.
+- **Rate limits:** Kite Connect allows up to 3000 instrument subscriptions per WebSocket connection.
+- Use `--log-level debug` to see WebSocket connection status, tick ingestion rates, and any errors.
+
+### WebSocket Modes
+
+Kite Connect WebSocket supports three subscription modes ([docs](https://kite.trade/docs/connect/v3/websocket/#modes)). The exporter uses **`full`** mode by default.
+
+| Mode | Packet Size | Data Included | Use Case |
+|------|-------------|---------------|----------|
+| `ltp` | 8 bytes | Last traded price only | Lightweight price-only monitoring |
+| `quote` | 44 bytes | LTP + OHLC + volume + buy/sell qty + last trade info | Standard real-time tracking |
+| **`full`** (default) | 184 bytes | All quote fields + **5-level market depth** (bid/ask price & qty at 5 levels) | Full order book analysis, spread calculation |
+
+**Why `full` is the default:** The exporter exposes bid/ask price, bid/ask quantity, and spread metrics which require market depth data — only available in `full` mode.
+
+To change the mode, edit `config.yaml`:
+
+```yaml
+kite:
+  ticker_mode: "full"      # ltp | quote | full
+```
+
+Or via environment variable:
+
+```bash
+export KITE_TICKER_MODE="full"
+```
+
+**Metrics available per mode:**
+
+| Metric | `ltp` | `quote` | `full` |
+|--------|:-----:|:-------:|:------:|
+| `maher_stock_price_current` | Yes | Yes | Yes |
+| `maher_stock_price_open` | - | Yes | Yes |
+| `maher_stock_price_high` | - | Yes | Yes |
+| `maher_stock_price_low` | - | Yes | Yes |
+| `maher_stock_price_close_prev` | - | Yes | Yes |
+| `maher_stock_price_change_percent` | - | Yes | Yes |
+| `maher_stock_volume_total` | - | Yes | Yes |
+| `maher_stock_volume_buy` | - | Yes | Yes |
+| `maher_stock_volume_sell` | - | Yes | Yes |
+| `maher_stock_last_traded_qty` | - | Yes | Yes |
+| `maher_stock_vwap` | - | - | Yes |
+| `maher_stock_bid_price` | - | - | Yes |
+| `maher_stock_ask_price` | - | - | Yes |
+| `maher_stock_bid_quantity` | - | - | Yes |
+| `maher_stock_ask_quantity` | - | - | Yes |
+| `maher_stock_spread` | - | - | Yes |
+
+---
+
 ## Build
 
 ### From Source
 
 ```bash
 # Build the binary (injects version/commit/date via ldflags)
-make build
+make
 # Output: ./stock_exporter
 
 # Or manually:
@@ -92,7 +328,7 @@ docker build -t stock_exporter:latest .
 Copy the built binary anywhere on your `$PATH`:
 
 ```bash
-make build
+make
 sudo cp stock_exporter /usr/local/bin/
 ```
 
@@ -131,6 +367,14 @@ The `bench` subcommand generates synthetic ticks and measures the full pipeline:
 # Quick benchmark
 ./stock_exporter bench --config config.yaml --symbols 3000 --iterations 20 --ingestion-duration 2s
 ```
+
+
+# Build & Run 
+```
+make
+./stock_exporter serve -c config.yaml
+```
+
 
 Example output:
 ```

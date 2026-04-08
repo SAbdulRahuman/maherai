@@ -1,0 +1,60 @@
+@import "tailwindcss";
+
+:root {
+  --background: #0f172a;
+  --foreground: #e2e8f0;
+  --card: #1e293b;
+  --card-border: #334155;
+  --accent: #38bdf8;
+  --accent-hover: #7dd3fc;
+  --green: #22c55e;
+  --red: #ef4444;
+  --muted: #94a3b8;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: var(--card);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--card-border);
+  border-radius: 3px;
+}
+
+/* Shared form input styles */
+.input-field {
+  width: 100%;
+  padding: 0.5rem 0.75rem;
+  background: #0f172a;
+  border: 1px solid #334155;
+  border-radius: 0.5rem;
+  color: #e2e8f0;
+  font-size: 0.875rem;
+  transition: border-color 0.15s;
+}
+.input-field:focus {
+  outline: none;
+  border-color: #38bdf8;
+  box-shadow: 0 0 0 1px #38bdf8;
+}
+.input-field::placeholder {
+  color: #64748b;
+}
+

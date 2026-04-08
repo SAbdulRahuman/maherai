@@ -150,3 +150,15 @@ func (c *Config) Validate() error {
 	}
 	return nil
 }
+
+// SaveConfig marshals the config to YAML and writes it to the given file path.
+func SaveConfig(filePath string, cfg *Config) error {
+	data, err := yaml.Marshal(cfg)
+	if err != nil {
+		return fmt.Errorf("marshalling config: %w", err)
+	}
+	if err := os.WriteFile(filePath, data, 0644); err != nil {
+		return fmt.Errorf("writing config file: %w", err)
+	}
+	return nil
+}

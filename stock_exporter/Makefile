@@ -14,17 +14,30 @@ LDFLAGS := -s -w \
 
 # ─── Targets ──────────────────────────────────────────────
 
-.PHONY: all build run test fmt lint vet clean docker docker-run tidy
+.PHONY: all build run test fmt lint vet clean docker docker-run tidy web-install web-build web-dev
 
-all: fmt vet build
+all: fmt vet web-build build
 
-## build: Compile the binary
+## build: Compile the binary (assumes web-build has run)
 build:
 	CGO_ENABLED=0 go build -ldflags '$(LDFLAGS)' -o $(BINARY_NAME) ./cmd/
 
 ## run: Build and run with default config
 run: build
-	./$(BINARY_NAME) --config config.yaml
+	./$(BINARY_NAME) serve --config config.yaml
+
+## web-install: Install Next.js UI dependencies
+web-install:
+	cd web && npm ci
+
+## web-build: Build the Next.js UI static export into internal/ui/static/
+web-build: web-install
+	cd web && npm run build
+	rm -rf internal/ui/static && cp -r web/out internal/ui/static
+
+## web-dev: Run the Next.js dev server (for frontend development)
+web-dev:
+	cd web && npm run dev
 
 ## test: Run all tests
 test:

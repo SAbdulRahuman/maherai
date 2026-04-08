@@ -16,7 +16,9 @@ import (
 	kiteconnect "github.com/zerodha/gokiteconnect/v4"
 
 	"github.com/maherai/stock_exporter/collector"
+	"github.com/maherai/stock_exporter/internal/api"
 	"github.com/maherai/stock_exporter/internal/client"
+	"github.com/maherai/stock_exporter/internal/ui"
 )
 
 var serveCmd = &cobra.Command{
@@ -66,12 +68,18 @@ func runServe(cmd *cobra.Command, args []string) error {
 	// ─── Ingestion Ring Buffer ───────────────────────────
 	ringBuf := client.NewRingBuffer(bufferSize)
 
-	// ─── Ingestion Workers ───────────────────────────────
+	// ─── Ingestion Workers (deferred until symbol count is known) ───
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	ingestionPool := client.NewIngestionPool(ringBuf, fastStore, workers, logger)
-	ingestionPool.Start(ctx)
+	startIngestion := func(symbolCount int) {
+		w := workers
+		if w <= 0 {
+			w = symbolCount // one worker per instrument for full parallelism
+		}
+		pool := client.NewIngestionPool(ringBuf, fastStore, w, logger)
+		pool.Start(ctx)
+	}
 
 	// ─── Kite Connect WebSocket Setup ────────────────────
 	var kiteTicker *client.KiteTickerClient
@@ -94,20 +102,33 @@ func runServe(cmd *cobra.Command, args []string) error {
 			logger.Info("Kite session established", "user_id", session.UserID)
 		}
 
+		// Filter out non-tradeable instruments (iNAV reference values, etc.)
+		tradeable, skipped := client.FilterTradeableSymbols(cfg.Symbols)
+		if len(skipped) > 0 {
+			logger.Info("filtered non-tradeable symbols",
+				"skipped", len(skipped),
+				"tradeable", len(tradeable),
+			)
+		}
+
 		// Resolve symbols → instrument tokens
 		resolver := client.NewInstrumentResolver(kc, cfg.Exchange, logger)
 		if err := resolver.Load(); err != nil {
 			return fmt.Errorf("failed to load instrument list: %w", err)
 		}
 
-		tokens, err := resolver.ResolveSymbols(cfg.Symbols)
+		tokens, err := resolver.ResolveSymbols(tradeable)
 		if err != nil {
 			return fmt.Errorf("failed to resolve symbols: %w", err)
 		}
 		logger.Info("instrument tokens resolved", "count", len(tokens))
 
-		// Register token→symbol mapping in FastTickStore
-		fastStore.RegisterSymbols(resolver.TokenToSymbol())
+		// Start ingestion workers — one per instrument for full parallelism
+		startIngestion(len(tokens))
+
+		// Register only resolved token→symbol mappings in FastTickStore
+		// (not the full 9K+ map — that overflows the 4K capacity)
+		fastStore.RegisterSymbols(resolver.ResolvedTokenToSymbol(tokens))
 
 		// Create WebSocket ticker wired to ring buffer (not directly to store)
 		kiteTicker = client.NewKiteTickerClient(client.KiteTickerConfig{
@@ -146,6 +167,8 @@ func runServe(cmd *cobra.Command, args []string) error {
 			logger,
 		)
 
+		startIngestion(len(cfg.Symbols))
+
 		tadawulScraper := client.NewTadawulScraper(tc, cfg.Symbols, cfg.ScrapeInterval, ringBuf, logger)
 		go tadawulScraper.Run(ctx)
 
@@ -159,6 +182,8 @@ func runServe(cmd *cobra.Command, args []string) error {
 			cfg.ScrapeTimeout,
 			logger,
 		)
+
+		startIngestion(len(cfg.Symbols))
 
 		scraper := collector.NewScraper(sc, cfg.Symbols, cfg.ScrapeInterval, logger)
 		go scraper.Run(ctx)
@@ -251,30 +276,26 @@ func runServe(cmd *cobra.Command, args []string) error {
 		}
 	})
 
+	// ─── REST + WebSocket API for UI ─────────────────────
+	cfgPath, _ := cmd.Flags().GetString("config")
+	apiHandler := api.NewHandler(cfg, cfgPath, fastStore, version, logger)
+	apiHandler.Register(mux)
+
+	// ─── Embedded UI (Next.js static export) ─────────────
+	staticFS, err := ui.Static()
+	if err != nil {
+		logger.Warn("embedded UI not available", "error", err)
+	} else {
+		uiHandler := http.FileServer(http.FS(staticFS))
+		mux.Handle("/ui/", http.StripPrefix("/ui/", uiHandler))
+	}
+
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/" {
-			http.NotFound(w, r)
+		if r.URL.Path == "/" {
+			http.Redirect(w, r, "/ui/", http.StatusTemporaryRedirect)
 			return
 		}
-		kiteStatus := "disabled"
-		if cfg.Kite.IsEnabled() {
-			kiteStatus = "connected"
-		}
-		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		fmt.Fprintf(w, `<!DOCTYPE html>
-<html>
-<head><title>Stock Exporter</title></head>
-<body>
-<h1>Stock Exporter — %s</h1>
-<p>Version: %s</p>
-<p>Kite WebSocket: %s</p>
-<p>Instruments: %d</p>
-<p>Metrics Mode: %s</p>
-<p><a href="%s">Metrics</a></p>
-<p><a href="/health">Health</a></p>
-<p><a href="/ready">Ready</a></p>
-</body>
-</html>`, cfg.Exchange, version, kiteStatus, fastStore.Count(), metricsMode, cfg.MetricsPath)
+		http.NotFound(w, r)
 	})
 
 	server := &http.Server{
