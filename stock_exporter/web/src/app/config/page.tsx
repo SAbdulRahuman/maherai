@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { getConfig, saveConfig } from "@/lib/api";
-import type { AppConfig } from "@/types/config";
+import { useEffect, useState, useRef, useCallback } from "react";
+import { getConfig, saveConfig, getConfigApplyStatus } from "@/lib/api";
+import type { AppConfig, ConfigApplyStatus } from "@/types/config";
+import ConfigApplyProgress from "@/components/ConfigApplyProgress";
 
 export default function ConfigPage() {
   const [config, setConfig] = useState<AppConfig | null>(null);
@@ -12,6 +13,8 @@ export default function ConfigPage() {
     type: "success" | "error";
     text: string;
   } | null>(null);
+  const [applyStatus, setApplyStatus] = useState<ConfigApplyStatus | null>(null);
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
     getConfig()
@@ -22,19 +25,90 @@ export default function ConfigPage() {
       .finally(() => setLoading(false));
   }, []);
 
+  // Cleanup polling on unmount
+  useEffect(() => {
+    return () => {
+      if (pollRef.current) clearInterval(pollRef.current);
+    };
+  }, []);
+
+  const startPolling = useCallback(() => {
+    if (pollRef.current) clearInterval(pollRef.current);
+
+    const poll = async () => {
+      try {
+        const status = await getConfigApplyStatus();
+        setApplyStatus(status);
+
+        if (status.state === "ready" || status.state === "error") {
+          if (pollRef.current) clearInterval(pollRef.current);
+          pollRef.current = null;
+          setSaving(false);
+
+          if (status.state === "ready") {
+            setMessage({ type: "success", text: "Configuration applied successfully!" });
+            // Reload config to reflect any changes
+            try {
+              const freshConfig = await getConfig();
+              setConfig(freshConfig);
+            } catch { /* ignore */ }
+          } else if (status.state === "error") {
+            setMessage({ type: "error", text: status.error || "Configuration failed." });
+          }
+        }
+      } catch {
+        // Network error during polling — keep trying
+      }
+    };
+
+    // Initial poll immediately
+    poll();
+    pollRef.current = setInterval(poll, 500);
+
+    // Timeout after 30s
+    setTimeout(() => {
+      if (pollRef.current) {
+        clearInterval(pollRef.current);
+        pollRef.current = null;
+        setSaving(false);
+        setApplyStatus((prev) =>
+          prev?.state === "applying"
+            ? { ...prev, state: "error", error: "Reconfiguration timed out after 30 seconds." }
+            : prev
+        );
+      }
+    }, 30000);
+  }, []);
+
   const handleSave = async () => {
     if (!config) return;
     setSaving(true);
     setMessage(null);
+    setApplyStatus(null);
     try {
       const res = await saveConfig(config);
-      setMessage({ type: "success", text: res.message || "Configuration saved!" });
+      if (res.status === "applying") {
+        // Server is doing live reconfiguration — start polling
+        setApplyStatus({
+          state: "applying",
+          current_step: "Initiating configuration update...",
+          completed_steps: [],
+        });
+        startPolling();
+      } else {
+        // Fallback (no manager) — old behavior
+        setSaving(false);
+        setMessage({ type: "success", text: res.message || "Configuration saved!" });
+      }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Unknown error";
-      setMessage({ type: "error", text: msg });
-    } finally {
       setSaving(false);
+      setMessage({ type: "error", text: msg });
     }
+  };
+
+  const dismissProgress = () => {
+    setApplyStatus(null);
   };
 
   const updateField = <K extends keyof AppConfig>(key: K, value: AppConfig[K]) => {
@@ -89,6 +163,11 @@ export default function ConfigPage() {
         >
           {message.text}
         </div>
+      )}
+
+      {/* Live reconfiguration progress overlay */}
+      {applyStatus && applyStatus.state !== "idle" && (
+        <ConfigApplyProgress status={applyStatus} onDismiss={dismissProgress} />
       )}
 
       {/* Server Settings */}

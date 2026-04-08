@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"os"
 	"os/signal"
@@ -13,9 +14,9 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/spf13/cobra"
-	kiteconnect "github.com/zerodha/gokiteconnect/v4"
 
 	"github.com/maherai/stock_exporter/collector"
+	"github.com/maherai/stock_exporter/config"
 	"github.com/maherai/stock_exporter/internal/api"
 	"github.com/maherai/stock_exporter/internal/client"
 	"github.com/maherai/stock_exporter/internal/ui"
@@ -68,158 +69,29 @@ func runServe(cmd *cobra.Command, args []string) error {
 	// ─── Ingestion Ring Buffer ───────────────────────────
 	ringBuf := client.NewRingBuffer(bufferSize)
 
-	// ─── Ingestion Workers (deferred until symbol count is known) ───
+	// ─── Root context ────────────────────────────────────
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	startIngestion := func(symbolCount int) {
-		w := workers
-		if w <= 0 {
-			w = symbolCount // one worker per instrument for full parallelism
-		}
-		pool := client.NewIngestionPool(ringBuf, fastStore, w, logger)
-		pool.Start(ctx)
-	}
+	// ─── DataSourceManager ───────────────────────────────
+	cfgPath, _ := cmd.Flags().GetString("config")
+	manager := client.NewDataSourceManager(client.DataSourceManagerConfig{
+		Config:     cfg,
+		ConfigPath: cfgPath,
+		FastStore:  fastStore,
+		RingBuf:    ringBuf,
+		Workers:    workers,
+		BufSize:    bufferSize,
+		Logger:     logger,
+	})
 
-	// ─── Kite Connect WebSocket Setup ────────────────────
-	var kiteTicker *client.KiteTickerClient
+	// Inject the data source builder — this keeps all client construction
+	// logic here in serve.go, avoiding circular imports.
+	manager.BuildDataSource = buildDataSourceFactory(logger)
 
-	if cfg.Kite.IsEnabled() {
-		logger.Info("Kite Connect enabled — setting up WebSocket ticker")
-
-		kc := kiteconnect.New(cfg.Kite.APIKey)
-		kc.SetAccessToken(cfg.Kite.AccessToken)
-
-		// Exchange request_token for access_token if needed
-		if cfg.Kite.AccessToken == "" && cfg.Kite.RequestToken != "" {
-			logger.Info("exchanging request_token for access_token")
-			session, err := kc.GenerateSession(cfg.Kite.RequestToken, cfg.Kite.APISecret)
-			if err != nil {
-				return fmt.Errorf("failed to generate Kite session: %w", err)
-			}
-			kc.SetAccessToken(session.AccessToken)
-			cfg.Kite.AccessToken = session.AccessToken
-			logger.Info("Kite session established", "user_id", session.UserID)
-		}
-
-		// Filter out non-tradeable instruments (iNAV reference values, etc.)
-		tradeable, skipped := client.FilterTradeableSymbols(cfg.Symbols)
-		if len(skipped) > 0 {
-			logger.Info("filtered non-tradeable symbols",
-				"skipped", len(skipped),
-				"tradeable", len(tradeable),
-			)
-		}
-
-		// Resolve symbols → instrument tokens
-		resolver := client.NewInstrumentResolver(kc, cfg.Exchange, logger)
-		if err := resolver.Load(); err != nil {
-			return fmt.Errorf("failed to load instrument list: %w", err)
-		}
-
-		tokens, err := resolver.ResolveSymbols(tradeable)
-		if err != nil {
-			return fmt.Errorf("failed to resolve symbols: %w", err)
-		}
-		logger.Info("instrument tokens resolved", "count", len(tokens))
-
-		// Start ingestion workers — one per instrument for full parallelism
-		startIngestion(len(tokens))
-
-		// Register only resolved token→symbol mappings in FastTickStore
-		// (not the full 9K+ map — that overflows the 4K capacity)
-		fastStore.RegisterSymbols(resolver.ResolvedTokenToSymbol(tokens))
-
-		// Create WebSocket ticker wired to ring buffer (not directly to store)
-		kiteTicker = client.NewKiteTickerClient(client.KiteTickerConfig{
-			APIKey:      cfg.Kite.APIKey,
-			AccessToken: cfg.Kite.AccessToken,
-			Exchange:    cfg.Exchange,
-			Currency:    cfg.Kite.Currency,
-			Mode:        cfg.Kite.TickerMode,
-		}, nil, tokens, logger) // nil TickStore — we use ring buffer path
-
-		// Override OnTick to write to ring buffer instead
-		kiteTicker.SetTickHandler(func(td *client.TickData) {
-			ringBuf.Enqueue(td)
-		})
-
-		go kiteTicker.Serve()
-
-		// ─── Token Expiry Monitor (0.1.9) ────────────────
-		tokenMgr := client.NewTokenManager(client.TokenManagerConfig{
-			APIKey:      cfg.Kite.APIKey,
-			APISecret:   cfg.Kite.APISecret,
-			AccessToken: cfg.Kite.AccessToken,
-			Logger:      logger,
-		})
-		tokenMgr.Start(ctx)
-
-	} else if cfg.Exchange == "TADAWUL" {
-		// ─── Tadawul-specific data source (Phase 1.2) ────
-		logger.Info("Tadawul exchange detected — using Tadawul client")
-
-		tc := client.NewTadawulClient(
-			cfg.StockAPIURL,
-			cfg.APIKey,
-			cfg.APISecret,
-			cfg.ScrapeTimeout,
-			logger,
-		)
-
-		startIngestion(len(cfg.Symbols))
-
-		tadawulScraper := client.NewTadawulScraper(tc, cfg.Symbols, cfg.ScrapeInterval, ringBuf, logger)
-		go tadawulScraper.Run(ctx)
-
-	} else {
-		logger.Warn("Kite Connect not configured — running with REST polling fallback")
-
-		sc := client.NewStockClient(
-			cfg.StockAPIURL,
-			cfg.APIKey,
-			cfg.Exchange,
-			cfg.ScrapeTimeout,
-			logger,
-		)
-
-		startIngestion(len(cfg.Symbols))
-
-		scraper := collector.NewScraper(sc, cfg.Symbols, cfg.ScrapeInterval, logger)
-		go scraper.Run(ctx)
-
-		// Bridge: REST cache → ring buffer → FastTickStore
-		go func() {
-			ticker := time.NewTicker(cfg.ScrapeInterval)
-			defer ticker.Stop()
-			for {
-				select {
-				case <-ctx.Done():
-					return
-				case <-ticker.C:
-					for sym, data := range sc.GetCached() {
-						ringBuf.Enqueue(&client.TickData{
-							Symbol:            sym,
-							Exchange:          data.Exchange,
-							Currency:          data.Currency,
-							LastPrice:         data.CurrentPrice,
-							OpenPrice:         data.OpenPrice,
-							HighPrice:         data.HighPrice,
-							LowPrice:          data.LowPrice,
-							ClosePrice:        data.PrevClose,
-							ChangePercent:     data.ChangePercent,
-							VolumeTraded:      uint32(data.Volume),
-							TotalBuyQuantity:  uint32(data.BuyVolume),
-							TotalSellQuantity: uint32(data.SellVolume),
-							BidPrice:          data.BidPrice,
-							AskPrice:          data.AskPrice,
-							BidQty:            uint32(data.BidQty),
-							AskQty:            uint32(data.AskQty),
-						})
-					}
-				}
-			}
-		}()
+	// Start the initial data source
+	if err := manager.Start(ctx); err != nil {
+		return fmt.Errorf("starting data source manager: %w", err)
 	}
 
 	// ─── Metrics Setup (Design A: Pre-Computed Cache + Design B: Live fallback) ─
@@ -277,8 +149,7 @@ func runServe(cmd *cobra.Command, args []string) error {
 	})
 
 	// ─── REST + WebSocket API for UI ─────────────────────
-	cfgPath, _ := cmd.Flags().GetString("config")
-	apiHandler := api.NewHandler(cfg, cfgPath, fastStore, version, logger)
+	apiHandler := api.NewHandler(cfg, cfgPath, fastStore, version, logger, manager)
 	apiHandler.Register(mux)
 
 	// ─── Embedded UI (Next.js static export) ─────────────
@@ -315,9 +186,7 @@ func runServe(cmd *cobra.Command, args []string) error {
 
 		cancel() // stop ingestion pool + metrics cache
 
-		if kiteTicker != nil {
-			kiteTicker.Stop()
-		}
+		manager.Stop()
 
 		shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer shutdownCancel()
@@ -339,4 +208,33 @@ func runServe(cmd *cobra.Command, args []string) error {
 
 	logger.Info("stock exporter stopped")
 	return nil
+}
+
+// buildDataSourceFactory returns a BuildDataSource function that creates the
+// appropriate DataSource based on the config's exchange and Kite settings.
+func buildDataSourceFactory(logger *slog.Logger) func(ctx context.Context, cfg *config.Config, ringBuf *client.RingBuffer, l *slog.Logger) (client.DataSource, func(*client.FastTickStore), error) {
+	return func(ctx context.Context, cfg *config.Config, ringBuf *client.RingBuffer, l *slog.Logger) (client.DataSource, func(*client.FastTickStore), error) {
+		if cfg.Kite.IsEnabled() {
+			logger.Info("Kite Connect enabled — building WebSocket data source")
+			return client.NewKiteDataSource(ctx, client.KiteDataSourceConfig{
+				Config:  cfg,
+				RingBuf: ringBuf,
+				Logger:  l,
+			})
+		}
+
+		if cfg.Exchange == "TADAWUL" {
+			logger.Info("Tadawul exchange — building Tadawul data source")
+			ds, registerFn := client.NewTadawulDataSource(cfg, ringBuf, l)
+			return ds, registerFn, nil
+		}
+
+		logger.Warn("Kite Connect not configured — building REST polling data source")
+		ds, registerFn := client.NewRESTDataSource(cfg, ringBuf, l)
+		ds.ScraperFactory = func(ctx context.Context, fetcher client.DataFetcher, symbols []string, interval time.Duration, logger *slog.Logger) {
+			scraper := collector.NewScraper(fetcher, symbols, interval, logger)
+			scraper.Run(ctx)
+		}
+		return ds, registerFn, nil
+	}
 }

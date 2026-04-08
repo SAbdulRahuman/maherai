@@ -78,8 +78,14 @@ func (k *KiteTickerClient) Serve() {
 }
 
 // Stop gracefully closes the WebSocket connection.
+// Recovers from a nil-conn panic if the WS is mid-reconnect.
 func (k *KiteTickerClient) Stop() {
 	k.logger.Info("stopping Kite WebSocket ticker")
+	defer func() {
+		if r := recover(); r != nil {
+			k.logger.Warn("recovered from ticker.Close panic during Stop", "panic", r)
+		}
+	}()
 	k.ticker.Close()
 }
 
@@ -88,6 +94,40 @@ func (k *KiteTickerClient) Stop() {
 // converted TickData. Use this to route ticks through a RingBuffer.
 func (k *KiteTickerClient) SetTickHandler(fn func(*TickData)) {
 	k.tickHandler = fn
+}
+
+// Reconnect tears down the existing WebSocket and creates a new one with
+// updated credentials. The same instrument tokens, mode, and tick handler
+// are preserved. Call this when API key or access token changes.
+func (k *KiteTickerClient) Reconnect(apiKey, accessToken string) {
+	k.logger.Info("reconnecting Kite ticker with new credentials")
+
+	// Stop existing connection — recover from nil-conn panic when the
+	// underlying WebSocket is in a reconnecting state (no active conn).
+	func() {
+		defer func() {
+			if r := recover(); r != nil {
+				k.logger.Warn("recovered from ticker.Close panic (connection was likely nil)", "panic", r)
+			}
+		}()
+		k.ticker.Close()
+	}()
+
+	// Create a new underlying ticker with new credentials
+	newTicker := kiteticker.New(apiKey, accessToken)
+	k.ticker = newTicker
+
+	// Re-register all callbacks
+	newTicker.OnConnect(k.onConnect)
+	newTicker.OnTick(k.onTick)
+	newTicker.OnError(k.onError)
+	newTicker.OnClose(k.onClose)
+	newTicker.OnReconnect(k.onReconnect)
+	newTicker.OnNoReconnect(k.onNoReconnect)
+
+	// Start the new connection in a goroutine
+	go k.ticker.Serve()
+	k.logger.Info("Kite ticker reconnected")
 }
 
 // ─── Callbacks ──────────────────────────────────────────────────────────────

@@ -136,6 +136,16 @@ func (tc *TadawulClient) fetchOne(symbol string) (*TadawulQuote, error) {
 	return &quote, nil
 }
 
+// UpdateCredentials swaps API credentials in-place behind the write lock.
+// The next FetchAll() call will automatically use the new credentials.
+func (tc *TadawulClient) UpdateCredentials(baseURL, apiKey, apiSecret string) {
+	tc.mu.Lock()
+	defer tc.mu.Unlock()
+	tc.baseURL = baseURL
+	tc.apiKey = apiKey
+	tc.apiSecret = apiSecret
+}
+
 // GetCached returns the latest cached data for all symbols.
 func (tc *TadawulClient) GetCached() map[string]*TadawulQuote {
 	tc.mu.RLock()

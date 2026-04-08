@@ -1,5 +1,5 @@
 // API client for the stock exporter backend
-import type { AppConfig } from "@/types/config";
+import type { AppConfig, ConfigApplyStatus } from "@/types/config";
 import type { TickData, ExporterStatus } from "@/types/stock";
 
 // In production (embedded), the API is on the same origin.
@@ -29,6 +29,10 @@ export async function saveConfig(
     method: "PUT",
     body: JSON.stringify(config),
   });
+}
+
+export async function getConfigApplyStatus(): Promise<ConfigApplyStatus> {
+  return fetchJSON<ConfigApplyStatus>("/api/config/apply-status");
 }
 
 export async function getTicks(symbols?: string[]): Promise<TickData[]> {

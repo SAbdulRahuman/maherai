@@ -1,5 +1,13 @@
 package client
 
+import (
+	"context"
+	"sync/atomic"
+	"time"
+
+	"github.com/maherai/stock_exporter/config"
+)
+
 // This file defines the core interfaces for the stock exporter data pipeline.
 // Following Interface Segregation Principle (ISP), each interface is focused
 // on a single capability so consumers only depend on what they actually use.
@@ -46,6 +54,20 @@ type DataFetcher interface {
 	FetchAll(symbols []string) (int, []error)
 }
 
+// DataSource abstracts a running data source (Kite WebSocket, Tadawul poller,
+// REST poller). The DataSourceManager uses this to start/stop/reconfigure
+// data sources at runtime without restarting the server.
+type DataSource interface {
+	// Start begins data ingestion. It should be non-blocking (launch goroutines internally).
+	Start(ctx context.Context) error
+	// Stop gracefully shuts down the data source.
+	Stop() error
+	// UpdateCredentials swaps credentials in-place behind a mutex and reconnects if needed.
+	UpdateCredentials(cfg *config.Config) error
+	// Exchange returns the exchange name this data source serves.
+	Exchange() string
+}
+
 // Logger abstracts structured logging so components don't depend on *slog.Logger.
 type Logger interface {
 	Info(msg string, args ...any)
@@ -53,6 +75,55 @@ type Logger interface {
 	Warn(msg string, args ...any)
 	Error(msg string, args ...any)
 }
+
+// ─── Reconfiguration Status ────────────────────────────────────────────────
+
+// ReconfigState represents the current state of a live reconfiguration.
+type ReconfigState string
+
+const (
+	ReconfigIdle     ReconfigState = "idle"
+	ReconfigApplying ReconfigState = "applying"
+	ReconfigReady    ReconfigState = "ready"
+	ReconfigError    ReconfigState = "error"
+)
+
+// ReconfigStatus tracks the progress of a live config reconfiguration.
+// Stored in an atomic.Pointer for lock-free reads from the API handler.
+type ReconfigStatus struct {
+	State          ReconfigState `json:"state"`
+	CurrentStep    string        `json:"current_step"`
+	CompletedSteps []string      `json:"completed_steps"`
+	Error          string        `json:"error,omitempty"`
+	StartedAt      time.Time     `json:"started_at,omitempty"`
+	FinishedAt     time.Time     `json:"finished_at,omitempty"`
+}
+
+// NewReconfigStatusIdle returns an idle status.
+func NewReconfigStatusIdle() *ReconfigStatus {
+	return &ReconfigStatus{
+		State:          ReconfigIdle,
+		CompletedSteps: []string{},
+	}
+}
+
+// AtomicReconfigStatus wraps atomic.Pointer for ReconfigStatus.
+type AtomicReconfigStatus struct {
+	v atomic.Pointer[ReconfigStatus]
+}
+
+// NewAtomicReconfigStatus creates a new atomic status initialized to idle.
+func NewAtomicReconfigStatus() *AtomicReconfigStatus {
+	s := &AtomicReconfigStatus{}
+	s.v.Store(NewReconfigStatusIdle())
+	return s
+}
+
+// Load returns the current status.
+func (a *AtomicReconfigStatus) Load() *ReconfigStatus { return a.v.Load() }
+
+// Store sets the current status.
+func (a *AtomicReconfigStatus) Store(s *ReconfigStatus) { a.v.Store(s) }
 
 // ────────────────────────────────────────────────────────────────────────────
 // Compile-time interface satisfaction checks.

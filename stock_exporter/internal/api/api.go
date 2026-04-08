@@ -24,6 +24,7 @@ type Handler struct {
 	logger     *slog.Logger
 	version    string
 	startTime  time.Time
+	manager    *client.DataSourceManager // hot-reload orchestrator
 
 	// WebSocket clients
 	wsMu    sync.Mutex
@@ -41,7 +42,7 @@ type wsClient struct {
 }
 
 // NewHandler creates a new API handler.
-func NewHandler(cfg *config.Config, configPath string, store client.TickSnapshotProvider, version string, logger *slog.Logger) *Handler {
+func NewHandler(cfg *config.Config, configPath string, store client.TickSnapshotProvider, version string, logger *slog.Logger, manager *client.DataSourceManager) *Handler {
 	h := &Handler{
 		configPath: configPath,
 		store:      store,
@@ -49,6 +50,7 @@ func NewHandler(cfg *config.Config, configPath string, store client.TickSnapshot
 		version:    version,
 		startTime:  time.Now(),
 		clients:    make(map[*wsClient]struct{}),
+		manager:    manager,
 		upgrader: websocket.Upgrader{
 			ReadBufferSize:  1024,
 			WriteBufferSize: 4096,
@@ -67,6 +69,7 @@ func (h *Handler) SetConfig(cfg *config.Config) {
 // Register mounts all API routes on the given mux.
 func (h *Handler) Register(mux *http.ServeMux) {
 	mux.HandleFunc("/api/config", h.handleConfig)
+	mux.HandleFunc("/api/config/apply-status", h.handleApplyStatus)
 	mux.HandleFunc("/api/ticks", h.handleTicks)
 	mux.HandleFunc("/api/symbols", h.handleSymbols)
 	mux.HandleFunc("/api/status", h.handleStatus)
@@ -229,18 +232,51 @@ func (h *Handler) putConfig(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Save to YAML file
+	// If manager is available, use live reconfiguration (async).
+	// Otherwise fall back to disk-only save.
+	if h.manager != nil {
+		// Launch async reconfiguration
+		go func() {
+			if err := h.manager.Reconfigure(cfg); err != nil {
+				h.logger.Error("async reconfiguration failed", "error", err)
+			}
+		}()
+
+		// Update the handler's config pointer immediately for API reads
+		h.config.Store(cfg)
+
+		h.logger.Info("configuration update initiated via API", "path", h.configPath)
+		writeJSON(w, http.StatusOK, map[string]string{
+			"status":  "applying",
+			"message": "Configuration is being applied. Poll /api/config/apply-status for progress.",
+		})
+		return
+	}
+
+	// Fallback: save to disk only (no live reload)
 	if err := config.SaveConfig(h.configPath, cfg); err != nil {
 		h.logger.Error("failed to save config", "error", err)
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "failed to save config: " + err.Error()})
 		return
 	}
 
-	// Update live config
 	h.config.Store(cfg)
-
-	h.logger.Info("configuration updated via API", "path", h.configPath)
+	h.logger.Info("configuration updated via API (disk only)", "path", h.configPath)
 	writeJSON(w, http.StatusOK, map[string]string{"status": "saved", "message": "Configuration saved. Restart server to apply connection changes."})
+}
+
+// ─── GET /api/config/apply-status ──────────────────────────────────────────
+
+func (h *Handler) handleApplyStatus(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	if h.manager == nil {
+		writeJSON(w, http.StatusOK, client.NewReconfigStatusIdle())
+		return
+	}
+	writeJSON(w, http.StatusOK, h.manager.Status())
 }
 
 // ─── GET /api/ticks ────────────────────────────────────────────────────────

@@ -4,6 +4,7 @@ import (
 	"log/slog"
 	"runtime"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -23,7 +24,7 @@ import (
 //   - LSP: any TickSnapshotProvider implementation can be substituted.
 type FastStockCollector struct {
 	store      client.TickSnapshotProvider
-	exchange   string
+	exchange   atomic.Value // string — updated via SetExchange()
 	numWorkers int
 	logger     *slog.Logger
 	descs      *StockMetricDescs
@@ -38,13 +39,19 @@ func NewFastStockCollector(store client.TickSnapshotProvider, exchange string, n
 		numWorkers = runtime.NumCPU()
 	}
 
-	return &FastStockCollector{
+	c := &FastStockCollector{
 		store:      store,
-		exchange:   exchange,
 		numWorkers: numWorkers,
 		logger:     logger,
 		descs:      NewStockMetricDescs(),
 	}
+	c.exchange.Store(exchange)
+	return c
+}
+
+// SetExchange updates the exchange label used in exporter-level metrics.
+func (c *FastStockCollector) SetExchange(exchange string) {
+	c.exchange.Store(exchange)
 }
 
 // Describe sends all metric descriptors to the channel.
@@ -56,23 +63,24 @@ func (c *FastStockCollector) Describe(ch chan<- *prometheus.Desc) {
 // workers for maximum throughput.
 func (c *FastStockCollector) Collect(ch chan<- prometheus.Metric) {
 	scrapeStart := time.Now()
+	exchange := c.exchange.Load().(string)
 
 	// Take a snapshot — single contiguous memory copy
 	ticks := c.store.Snapshot()
 
 	// Exporter-level metrics (always emitted)
 	if len(ticks) == 0 {
-		ch <- prometheus.MustNewConstMetric(c.descs.ScrapeSuccess, prometheus.GaugeValue, 0, c.exchange)
-		ch <- prometheus.MustNewConstMetric(c.descs.Up, prometheus.GaugeValue, 1, c.exchange)
-		ch <- prometheus.MustNewConstMetric(c.descs.InstrumentsActive, prometheus.GaugeValue, 0, c.exchange)
-		ch <- prometheus.MustNewConstMetric(c.descs.ScrapeDuration, prometheus.GaugeValue, time.Since(scrapeStart).Seconds(), c.exchange)
-		ch <- prometheus.MustNewConstMetric(c.descs.ScrapeErrorsTotal, prometheus.GaugeValue, float64(c.scrapeErrors), c.exchange)
+		ch <- prometheus.MustNewConstMetric(c.descs.ScrapeSuccess, prometheus.GaugeValue, 0, exchange)
+		ch <- prometheus.MustNewConstMetric(c.descs.Up, prometheus.GaugeValue, 1, exchange)
+		ch <- prometheus.MustNewConstMetric(c.descs.InstrumentsActive, prometheus.GaugeValue, 0, exchange)
+		ch <- prometheus.MustNewConstMetric(c.descs.ScrapeDuration, prometheus.GaugeValue, time.Since(scrapeStart).Seconds(), exchange)
+		ch <- prometheus.MustNewConstMetric(c.descs.ScrapeErrorsTotal, prometheus.GaugeValue, float64(c.scrapeErrors), exchange)
 		return
 	}
 
-	ch <- prometheus.MustNewConstMetric(c.descs.ScrapeSuccess, prometheus.GaugeValue, 1, c.exchange)
-	ch <- prometheus.MustNewConstMetric(c.descs.Up, prometheus.GaugeValue, 1, c.exchange)
-	ch <- prometheus.MustNewConstMetric(c.descs.InstrumentsActive, prometheus.GaugeValue, float64(len(ticks)), c.exchange)
+	ch <- prometheus.MustNewConstMetric(c.descs.ScrapeSuccess, prometheus.GaugeValue, 1, exchange)
+	ch <- prometheus.MustNewConstMetric(c.descs.Up, prometheus.GaugeValue, 1, exchange)
+	ch <- prometheus.MustNewConstMetric(c.descs.InstrumentsActive, prometheus.GaugeValue, float64(len(ticks)), exchange)
 
 	// Partition ticks into chunks for parallel processing
 	numWorkers := c.numWorkers
@@ -103,8 +111,8 @@ func (c *FastStockCollector) Collect(ch chan<- prometheus.Metric) {
 	wg.Wait()
 
 	// Emit scrape duration and error count
-	ch <- prometheus.MustNewConstMetric(c.descs.ScrapeDuration, prometheus.GaugeValue, time.Since(scrapeStart).Seconds(), c.exchange)
-	ch <- prometheus.MustNewConstMetric(c.descs.ScrapeErrorsTotal, prometheus.GaugeValue, float64(c.scrapeErrors), c.exchange)
+	ch <- prometheus.MustNewConstMetric(c.descs.ScrapeDuration, prometheus.GaugeValue, time.Since(scrapeStart).Seconds(), exchange)
+	ch <- prometheus.MustNewConstMetric(c.descs.ScrapeErrorsTotal, prometheus.GaugeValue, float64(c.scrapeErrors), exchange)
 }
 
 // emitChunk emits metrics for a subset of ticks. Called by parallel workers.

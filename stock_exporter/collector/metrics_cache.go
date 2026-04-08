@@ -29,7 +29,7 @@ import (
 //   - OCP: new metrics are added by updating descriptors.go constants.
 type MetricsCache struct {
 	store    client.TickSnapshotProvider
-	exchange string
+	exchange atomic.Value // string — updated via SetExchange()
 	logger   *slog.Logger
 
 	current atomic.Pointer[CachedResponse]
@@ -56,7 +56,6 @@ type CachedResponse struct {
 func NewMetricsCache(store client.TickSnapshotProvider, exchange string, logger *slog.Logger) *MetricsCache {
 	mc := &MetricsCache{
 		store:    store,
-		exchange: exchange,
 		logger:   logger,
 		interval: 500 * time.Millisecond,
 		bufPool: sync.Pool{
@@ -67,6 +66,7 @@ func NewMetricsCache(store client.TickSnapshotProvider, exchange string, logger 
 			},
 		},
 	}
+	mc.exchange.Store(exchange)
 
 	// Build an initial empty response
 	mc.current.Store(&CachedResponse{
@@ -75,6 +75,11 @@ func NewMetricsCache(store client.TickSnapshotProvider, exchange string, logger 
 	})
 
 	return mc
+}
+
+// SetExchange updates the exchange label used in exporter-level metrics.
+func (mc *MetricsCache) SetExchange(exchange string) {
+	mc.exchange.Store(exchange)
 }
 
 // Start begins the background rebuild loop. Call from a goroutine or it will block.
@@ -179,7 +184,7 @@ func (mc *MetricsCache) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 // writeMetrics writes all metric families in Prometheus text exposition format.
 func (mc *MetricsCache) writeMetrics(buf *bytes.Buffer, ticks []client.TickData) {
-	exchange := mc.exchange
+	exchange := mc.exchange.Load().(string)
 
 	// ─── Exporter-level metrics ──────────────────────────
 	scrapeSuccess := 0.0

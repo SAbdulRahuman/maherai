@@ -63,6 +63,18 @@ func (tm *TokenManager) SetOnTokenRefresh(fn func(newToken string)) {
 	tm.onTokenRefresh = fn
 }
 
+// UpdateCredentials swaps credentials in the token manager.
+func (tm *TokenManager) UpdateCredentials(apiKey, apiSecret, accessToken string) {
+	tm.mu.Lock()
+	defer tm.mu.Unlock()
+	tm.apiKey = apiKey
+	tm.apiSecret = apiSecret
+	tm.accessToken = accessToken
+	tm.tokenSetAt = time.Now()
+	tm.kc = kiteconnect.New(apiKey)
+	tm.kc.SetAccessToken(accessToken)
+}
+
 // AccessToken returns the current access token.
 func (tm *TokenManager) AccessToken() string {
 	tm.mu.RLock()

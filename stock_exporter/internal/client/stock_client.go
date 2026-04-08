@@ -129,6 +129,16 @@ func (sc *StockClient) fetchOne(symbol string) (*StockData, error) {
 	return &data, nil
 }
 
+// UpdateCredentials swaps API credentials in-place behind the write lock.
+// The next FetchAll() call will automatically use the new credentials.
+func (sc *StockClient) UpdateCredentials(baseURL, apiKey, exchange string) {
+	sc.mu.Lock()
+	defer sc.mu.Unlock()
+	sc.baseURL = baseURL
+	sc.apiKey = apiKey
+	sc.exchange = exchange
+}
+
 // GetCached returns the latest cached data for all symbols.
 // This is called by the Prometheus collector on each scrape.
 func (sc *StockClient) GetCached() map[string]*StockData {

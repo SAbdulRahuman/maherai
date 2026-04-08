@@ -23,3 +23,16 @@ export interface AppConfig {
   scrape_timeout: string;
   symbols: string[];
 }
+
+// ─── Reconfiguration Status (mirrors client.ReconfigStatus) ────────────────
+
+export type ReconfigState = "idle" | "applying" | "ready" | "error";
+
+export interface ConfigApplyStatus {
+  state: ReconfigState;
+  current_step: string;
+  completed_steps: string[];
+  error?: string;
+  started_at?: string;
+  finished_at?: string;
+}
