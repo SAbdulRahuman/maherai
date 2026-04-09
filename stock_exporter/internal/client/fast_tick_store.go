@@ -25,6 +25,10 @@ type FastTickStore struct {
 
 	count    atomic.Int32 // number of distinct instruments seen
 	capacity int          // max instruments
+
+	// Observer callback — fires after every successful Update().
+	// Must be non-blocking (use channel-based dispatch internally).
+	onUpdate func(*TickData)
 }
 
 // NewFastTickStore creates a pre-allocated tick store with capacity for
@@ -39,6 +43,13 @@ func NewFastTickStore(maxInstruments int) *FastTickStore {
 		indexMap: make(map[uint32]int, maxInstruments),
 		capacity: maxInstruments,
 	}
+}
+
+// SetOnUpdate registers an observer callback that fires after every tick update.
+// The callback must be non-blocking — use a channel-based dispatcher internally.
+// Must be called before Start()/Update() — not safe for concurrent use with Update().
+func (fs *FastTickStore) SetOnUpdate(fn func(*TickData)) {
+	fs.onUpdate = fn
 }
 
 // RegisterSymbols sets up the token→slot mapping and symbol names.
@@ -108,6 +119,11 @@ func (fs *FastTickStore) Update(td *TickData) {
 
 	// Bump version for this slot (lock-free)
 	fs.versions[idx].Add(1)
+
+	// Fire observer (non-blocking — observers must not block the hot path)
+	if fs.onUpdate != nil {
+		fs.onUpdate(td)
+	}
 
 	// Track first-time activation — CAS ensures exactly one goroutine
 	// increments the count for this slot.

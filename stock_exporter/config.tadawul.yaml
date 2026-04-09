@@ -17,6 +17,17 @@ api_secret: ""
 scrape_interval: 15s
 scrape_timeout: 10s
 
+# RedPanda / Kafka producer (optional)
+# Uncomment to enable publishing ticks to RedPanda.
+# redpanda:
+#   brokers:
+#     - "localhost:9092"
+#   topic: "stock-ticks-tadawul"
+#   batch_size: 1000
+#   linger_ms: 5
+#   compression: "snappy"
+#   buffer_size: 131072
+
 # Watchlist — Tadawul stock symbols
 symbols:
   - "2222"    # Saudi Aramco

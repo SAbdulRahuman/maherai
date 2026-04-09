@@ -80,16 +80,17 @@ func (h *Handler) Register(mux *http.ServeMux) {
 
 // configResponse is a JSON-safe version of Config with masked secrets.
 type configResponse struct {
-	ListenAddress  string             `json:"listen_address"`
-	MetricsPath    string             `json:"metrics_path"`
-	Exchange       string             `json:"exchange"`
-	Kite           kiteConfigResponse `json:"kite"`
-	StockAPIURL    string             `json:"stock_api_url"`
-	APIKey         string             `json:"api_key"`
-	APISecret      string             `json:"api_secret"`
-	ScrapeInterval string             `json:"scrape_interval"`
-	ScrapeTimeout  string             `json:"scrape_timeout"`
-	Symbols        []string           `json:"symbols"`
+	ListenAddress  string                 `json:"listen_address"`
+	MetricsPath    string                 `json:"metrics_path"`
+	Exchange       string                 `json:"exchange"`
+	Kite           kiteConfigResponse     `json:"kite"`
+	RedPanda       redpandaConfigResponse `json:"redpanda"`
+	StockAPIURL    string                 `json:"stock_api_url"`
+	APIKey         string                 `json:"api_key"`
+	APISecret      string                 `json:"api_secret"`
+	ScrapeInterval string                 `json:"scrape_interval"`
+	ScrapeTimeout  string                 `json:"scrape_timeout"`
+	Symbols        []string               `json:"symbols"`
 }
 
 type kiteConfigResponse struct {
@@ -101,6 +102,16 @@ type kiteConfigResponse struct {
 	Currency          string `json:"currency"`
 	MaxReconnect      int    `json:"max_reconnect_attempts"`
 	ReconnectInterval string `json:"reconnect_interval"`
+}
+
+type redpandaConfigResponse struct {
+	Enabled     bool     `json:"enabled"`
+	Brokers     []string `json:"brokers"`
+	Topic       string   `json:"topic"`
+	BatchSize   int      `json:"batch_size"`
+	LingerMs    int      `json:"linger_ms"`
+	Compression string   `json:"compression"`
+	BufferSize  int      `json:"buffer_size"`
 }
 
 func maskSecret(s string) string {
@@ -124,6 +135,15 @@ func (h *Handler) configToResponse(cfg *config.Config) configResponse {
 			Currency:          cfg.Kite.Currency,
 			MaxReconnect:      cfg.Kite.MaxReconnect,
 			ReconnectInterval: cfg.Kite.ReconnectInterval.String(),
+		},
+		RedPanda: redpandaConfigResponse{
+			Enabled:     cfg.RedPanda.IsEnabled(),
+			Brokers:     cfg.RedPanda.Brokers,
+			Topic:       cfg.RedPanda.Topic,
+			BatchSize:   cfg.RedPanda.BatchSize,
+			LingerMs:    cfg.RedPanda.LingerMs,
+			Compression: cfg.RedPanda.Compression,
+			BufferSize:  cfg.RedPanda.BufferSize,
 		},
 		StockAPIURL:    cfg.StockAPIURL,
 		APIKey:         cfg.APIKey,
@@ -149,6 +169,14 @@ type configUpdateRequest struct {
 		MaxReconnect      int    `json:"max_reconnect_attempts"`
 		ReconnectInterval string `json:"reconnect_interval"`
 	} `json:"kite"`
+	RedPanda struct {
+		Brokers     []string `json:"brokers"`
+		Topic       string   `json:"topic"`
+		BatchSize   int      `json:"batch_size"`
+		LingerMs    int      `json:"linger_ms"`
+		Compression string   `json:"compression"`
+		BufferSize  int      `json:"buffer_size"`
+	} `json:"redpanda"`
 	StockAPIURL    string   `json:"stock_api_url"`
 	APIKey         string   `json:"api_key"`
 	APISecret      string   `json:"api_secret"`
@@ -224,6 +252,22 @@ func (h *Handler) putConfig(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		cfg.Kite.ReconnectInterval = d
+	}
+
+	// RedPanda config
+	cfg.RedPanda.Brokers = req.RedPanda.Brokers
+	cfg.RedPanda.Topic = req.RedPanda.Topic
+	if req.RedPanda.BatchSize > 0 {
+		cfg.RedPanda.BatchSize = req.RedPanda.BatchSize
+	}
+	if req.RedPanda.LingerMs > 0 {
+		cfg.RedPanda.LingerMs = req.RedPanda.LingerMs
+	}
+	if req.RedPanda.Compression != "" {
+		cfg.RedPanda.Compression = req.RedPanda.Compression
+	}
+	if req.RedPanda.BufferSize > 0 {
+		cfg.RedPanda.BufferSize = req.RedPanda.BufferSize
 	}
 
 	// Validate
@@ -390,12 +434,22 @@ func (h *Handler) handleStatus(w http.ResponseWriter, r *http.Request) {
 	}
 	cfg := h.config.Load()
 	resp := map[string]interface{}{
-		"version":      h.version,
-		"exchange":     cfg.Exchange,
-		"instruments":  h.store.Count(),
-		"uptime":       time.Since(h.startTime).String(),
-		"kite_enabled": cfg.Kite.IsEnabled(),
-		"ws_clients":   h.wsClientCount(),
+		"version":          h.version,
+		"exchange":         cfg.Exchange,
+		"instruments":      h.store.Count(),
+		"uptime":           time.Since(h.startTime).String(),
+		"kite_enabled":     cfg.Kite.IsEnabled(),
+		"redpanda_enabled": cfg.RedPanda.IsEnabled(),
+		"ws_clients":       h.wsClientCount(),
+	}
+
+	// Add RedPanda stats if manager has a producer
+	if h.manager != nil {
+		if p := h.manager.Producer(); p != nil {
+			resp["redpanda_published"] = p.Published()
+			resp["redpanda_dropped"] = p.Dropped()
+			resp["redpanda_running"] = p.IsRunning()
+		}
 	}
 	writeJSON(w, http.StatusOK, resp)
 }

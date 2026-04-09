@@ -11,11 +11,22 @@ export interface KiteConfig {
   reconnect_interval: string;
 }
 
+export interface RedPandaConfig {
+  enabled: boolean;
+  brokers: string[];
+  topic: string;
+  batch_size: number;
+  linger_ms: number;
+  compression: string;
+  buffer_size: number;
+}
+
 export interface AppConfig {
   listen_address: string;
   metrics_path: string;
   exchange: string;
   kite: KiteConfig;
+  redpanda: RedPandaConfig;
   stock_api_url: string;
   api_key: string;
   api_secret: string;

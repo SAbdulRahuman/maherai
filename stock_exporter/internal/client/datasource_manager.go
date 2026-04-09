@@ -45,6 +45,9 @@ type DataSourceManager struct {
 
 	logger *slog.Logger
 
+	// RedPanda producer (optional — nil when not configured)
+	producer *RedPandaProducer
+
 	// Builder function — injected by serve.go to avoid circular deps.
 	// Builds a DataSource from config, wired to ringBuf. Returns the
 	// data source and a function to register symbols in fastStore.
@@ -97,6 +100,20 @@ func (m *DataSourceManager) Status() *ReconfigStatus {
 // FastStore returns the shared tick store.
 func (m *DataSourceManager) FastStore() *FastTickStore {
 	return m.fastStore
+}
+
+// SetProducer sets the RedPanda producer for live reconfiguration support.
+func (m *DataSourceManager) SetProducer(p *RedPandaProducer) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.producer = p
+}
+
+// Producer returns the current RedPanda producer (may be nil).
+func (m *DataSourceManager) Producer() *RedPandaProducer {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.producer
 }
 
 // Start launches the initial data source using the boot config.
@@ -302,6 +319,9 @@ func (m *DataSourceManager) Reconfigure(newCfg *config.Config) error {
 		}
 	}
 
+	// ── Step 4: RedPanda producer reconfiguration ──────
+	m.reconfigureRedPanda(newCfg, startTime)
+
 	// ── Done ────────────────────────────────────────────
 	m.exchange.Store(newCfg.Exchange)
 	finishTime := time.Now()
@@ -319,6 +339,79 @@ func (m *DataSourceManager) Reconfigure(newCfg *config.Config) error {
 	)
 
 	return nil
+}
+
+// reconfigureRedPanda handles RedPanda producer lifecycle during reconfiguration.
+// Caller must hold m.mu.
+func (m *DataSourceManager) reconfigureRedPanda(newCfg *config.Config, startTime time.Time) {
+	oldCfg := m.config.Load()
+	wasEnabled := oldCfg != nil && oldCfg.RedPanda.IsEnabled()
+	nowEnabled := newCfg.RedPanda.IsEnabled()
+
+	switch {
+	case !wasEnabled && !nowEnabled:
+		// No change — RedPanda remains disabled
+		return
+
+	case !wasEnabled && nowEnabled:
+		// Disabled → Enabled: create and start producer
+		m.updateStatus(ReconfigApplying, "Starting RedPanda producer", nil)
+		producer, err := NewRedPandaProducer(newCfg.RedPanda, m.logger)
+		if err != nil {
+			m.logger.Error("failed to create RedPanda producer during reconfig", "error", err)
+			m.addCompletedStep("RedPanda producer creation failed: " + err.Error())
+			return
+		}
+		m.fastStore.SetOnUpdate(producer.Enqueue)
+		producer.Start(context.Background())
+		m.producer = producer
+		m.addCompletedStep("RedPanda producer started")
+
+	case wasEnabled && !nowEnabled:
+		// Enabled → Disabled: stop and remove producer
+		m.updateStatus(ReconfigApplying, "Stopping RedPanda producer", nil)
+		if m.producer != nil {
+			m.fastStore.SetOnUpdate(nil)
+			m.producer.Stop()
+			m.producer = nil
+		}
+		m.addCompletedStep("RedPanda producer stopped")
+
+	case wasEnabled && nowEnabled:
+		// Both enabled: check if config changed
+		if redpandaConfigChanged(oldCfg.RedPanda, newCfg.RedPanda) {
+			m.updateStatus(ReconfigApplying, "Reconfiguring RedPanda producer", nil)
+			if m.producer != nil {
+				if err := m.producer.UpdateConfig(newCfg.RedPanda); err != nil {
+					m.logger.Error("failed to reconfigure RedPanda producer", "error", err)
+					m.addCompletedStep("RedPanda producer reconfiguration failed: " + err.Error())
+					return
+				}
+				// Re-attach observer in case channel was recreated
+				m.fastStore.SetOnUpdate(m.producer.Enqueue)
+			}
+			m.addCompletedStep("RedPanda producer reconfigured")
+		}
+	}
+}
+
+// redpandaConfigChanged returns true if the RedPanda configuration has changed.
+func redpandaConfigChanged(a, b config.RedPandaConfig) bool {
+	if a.Topic != b.Topic {
+		return true
+	}
+	if len(a.Brokers) != len(b.Brokers) {
+		return true
+	}
+	for i := range a.Brokers {
+		if a.Brokers[i] != b.Brokers[i] {
+			return true
+		}
+	}
+	if a.BatchSize != b.BatchSize || a.LingerMs != b.LingerMs || a.Compression != b.Compression || a.BufferSize != b.BufferSize {
+		return true
+	}
+	return false
 }
 
 // ─── Status helpers ─────────────────────────────────────────────────────────

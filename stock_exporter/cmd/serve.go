@@ -47,6 +47,7 @@ func runServe(cmd *cobra.Command, args []string) error {
 		"exchange", cfg.Exchange,
 		"symbols", len(cfg.Symbols),
 		"kite_enabled", cfg.Kite.IsEnabled(),
+		"redpanda_enabled", cfg.RedPanda.IsEnabled(),
 	)
 
 	bufferSize, _ := cmd.Flags().GetInt("buffer-size")
@@ -88,6 +89,25 @@ func runServe(cmd *cobra.Command, args []string) error {
 	// Inject the data source builder — this keeps all client construction
 	// logic here in serve.go, avoiding circular imports.
 	manager.BuildDataSource = buildDataSourceFactory(logger)
+
+	// ─── Optional RedPanda Producer ──────────────────────
+	var redpandaProducer *client.RedPandaProducer
+	if cfg.RedPanda.IsEnabled() {
+		var err error
+		redpandaProducer, err = client.NewRedPandaProducer(cfg.RedPanda, logger)
+		if err != nil {
+			return fmt.Errorf("creating redpanda producer: %w", err)
+		}
+		fastStore.SetOnUpdate(redpandaProducer.Enqueue)
+		redpandaProducer.Start(ctx)
+		manager.SetProducer(redpandaProducer)
+		logger.Info("redpanda producer enabled",
+			"brokers", cfg.RedPanda.Brokers,
+			"topic", cfg.RedPanda.Topic,
+		)
+	} else {
+		logger.Info("redpanda producer disabled (no brokers/topic configured)")
+	}
 
 	// Start the initial data source
 	if err := manager.Start(ctx); err != nil {
@@ -185,6 +205,11 @@ func runServe(cmd *cobra.Command, args []string) error {
 		logger.Info("received shutdown signal", "signal", sig)
 
 		cancel() // stop ingestion pool + metrics cache
+
+		// Stop RedPanda producer (flush remaining records)
+		if redpandaProducer != nil {
+			redpandaProducer.Stop()
+		}
 
 		manager.Stop()
 

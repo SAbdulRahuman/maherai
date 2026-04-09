@@ -18,6 +18,16 @@
   - [Architecture](#architecture)
   - [Project Structure](#project-structure)
   - [Phase 0.1 — Zerodha Kite Connect WebSocket Integration (phase 0.1\_zerodha)](#phase-01--zerodha-kite-connect-websocket-integration-phase-01_zerodha)
+    - [Architecture — WebSocket Tick Pipeline](#architecture--websocket-tick-pipeline)
+    - [Kite WebSocket Modes](#kite-websocket-modes)
+    - [Tick Data → Prometheus Metric Mapping](#tick-data--prometheus-metric-mapping)
+    - [Authentication Flow](#authentication-flow)
+    - [Instrument Token Resolution](#instrument-token-resolution)
+    - [Task Breakdown](#task-breakdown)
+    - [Configuration (YAML)](#configuration-yaml)
+    - [WebSocket Limits \& Considerations](#websocket-limits--considerations)
+    - [New Files](#new-files)
+    - [Success Criteria — Phase 0.1](#success-criteria--phase-01)
   - [Phase 1.1 — Zerodha / NSE Stock Exporter](#phase-11--zerodha--nse-stock-exporter)
   - [Phase 1.2 — Saudi Tadawul Stock Exporter](#phase-12--saudi-tadawul-stock-exporter)
   - [Phase 1.3 — Metrics Schema Design](#phase-13--metrics-schema-design)
@@ -32,6 +42,15 @@
     - [Dockerfile (multi-stage)](#dockerfile-multi-stage)
   - [Success Criteria](#success-criteria)
   - [What Comes Next](#what-comes-next)
+- [RedPanda feature](#redpanda-feature)
+  - [Steps](#steps)
+  - [Verification](#verification)
+  - [Decisions](#decisions)
+  - [RedPanda Integration — Complete ✅](#redpanda-integration--complete-)
+    - [Files Created](#files-created)
+    - [Files Modified](#files-modified)
+    - [Data Flow](#data-flow)
+    - [How to Enable](#how-to-enable)
 
 ---
 
@@ -476,3 +495,149 @@ See the full roadmap in [../plan.md](../plan.md).
 ---
 
 > _The stock_exporter is the foundation — every metric, alert, dashboard, and AI insight in Maher AI starts here._
+
+
+---
+# RedPanda feature
+
+Plan: Optional RedPanda Tick Publisher
+Stock ticks flowing through FastTickStore.Update() will be optionally published to RedPanda via a new observer callback. The feature activates when redpanda is configured in YAML (following the existing KiteConfig.IsEnabled() pattern). A new RedPandaProducer component uses franz-go for Kafka-compatible publishing, serializes TickData as JSON, and supports live reconfiguration through the existing /api/config endpoint. The observer pattern from design.md §4.3 is finally realized.
+
+## Steps
+
+1. Add RedPandaConfig to Config struct in config.go
+
+New struct with fields: Brokers []string, Topic string, BatchSize int (default 1000), LingerMs int (default 5), CompressionType string (default "snappy"), TLS *TLSConfig (optional sub-struct with Enabled, CertFile, KeyFile, CAFile), SASL *SASLConfig (optional: Mechanism, Username, Password)
+Add RedPanda RedPandaConfig field to Config struct with yaml:"redpanda"
+Add IsEnabled() bool method — returns true when len(Brokers) > 0 && Topic != ""
+Extend Validate() (after config.go:141): if RedPanda.IsEnabled(), validate broker addresses aren't empty strings, topic name is valid, TLS files exist if TLS enabled
+Extend DefaultConfig() with zero-value RedPandaConfig (disabled by default)
+Add observer hook to FastTickStore in fast_tick_store.go
+
+2. Add field onUpdate func(*TickData) to FastTickStore struct
+Add method SetOnUpdate(fn func(*TickData)) — sets the observer callback (guarded by a mutex or set once at init)
+In Update(), after the version bump at fast_tick_store.go:111, call if fs.onUpdate != nil { fs.onUpdate(td) } — uses select+default drop semantics (non-blocking) by having the callback enqueue to an internal channel
+The callback receives a pointer to the already-copied tick (since fs.ticks[idx] = *td is a value copy, pass td which is the original pointer — safe because ingestion pool owns it for this iteration)
+
+3. Create RedPandaProducer — new file internal/client/redpanda_producer.go
+
+Struct: RedPandaProducer with franz-go *kgo.Client, topic string, internal bounded channel chan *TickData (capacity ~131072), done chan struct{}
+Constructor NewRedPandaProducer(cfg config.RedPandaConfig, logger Logger) (*RedPandaProducer, error) — creates franz-go client with kgo.SeedBrokers(cfg.Brokers...), kgo.DefaultProduceTopic(cfg.Topic), batch/linger/compression opts, optional TLS/SASL
+Method Enqueue(td *TickData) — non-blocking send to internal channel (drop on full, increment a dropped atomic counter for observability)
+Method Start(ctx context.Context) — goroutine that drains channel, JSON-marshals each TickData, calls client.Produce() with async callback. Key: td.Symbol as Kafka partition key for ordering per-symbol
+Method Stop() — close channel, flush pending records via client.Flush(), close client
+Method UpdateConfig(cfg config.RedPandaConfig) error — stop old client, create new client with new config (for live reconfig)
+Add self-instrumentation: Prometheus counter redpanda_ticks_published_total, redpanda_ticks_dropped_total, histogram redpanda_publish_duration_seconds
+
+4. Wire producer into DataSourceManager in datasource_manager.go
+
+Add field producer *RedPandaProducer to DataSourceManager
+Add method SetProducer(p *RedPandaProducer)
+In Reconfigure() (after datasource_manager.go:175 — config saved to disk): detect if RedPanda config changed. If so, call producer.UpdateConfig(newCfg.RedPanda) or create/destroy producer. Add status steps: "RedPanda producer reconfigured"
+Handle transitions: disabled→enabled (create + start), enabled→disabled (stop + nil), enabled→changed (stop + recreate)
+
+5. Wire in runServe() in serve.go
+
+After FastTickStore creation (line 71) and before manager.Start() (line 96):
+Check cfg.RedPanda.IsEnabled()
+If enabled: create NewRedPandaProducer(cfg.RedPanda, logger), call fastStore.SetOnUpdate(producer.Enqueue), call producer.Start(ctx), pass producer to manager via manager.SetProducer(producer)
+In graceful shutdown section: call producer.Stop() before server shutdown
+
+6. Extend API layer in api.go
+
+Add RedPanda fields to configUpdateRequest struct: RedPandaBrokers []string, RedPandaTopic string, RedPandaBatchSize int, etc.
+In putConfig() (around api.go:222), map request fields → cfg.RedPanda
+The existing async manager.Reconfigure(cfg) call handles the rest
+
+7. Update config files
+
+Add commented-out redpanda: section to config.yaml and config.tadawul.yaml showing all available options with sensible defaults
+Example:
+
+```yaml
+# redpanda:
+#   brokers: ["localhost:9092"]
+#   topic: "stock-ticks"
+#   batch_size: 1000
+#   linger_ms: 5
+#   compression: "snappy"
+```
+
+8. Add franz-go dependency
+
+go get github.com/twmb/franz-go and github.com/twmb/franz-go/pkg/kgo
+Update go.mod
+
+9. Add tests — new file internal/client/redpanda_producer_test.go
+
+Unit test: TestRedPandaProducerEnqueue — verify non-blocking drop semantics
+Unit test: TestRedPandaConfigIsEnabled — verify enable/disable logic
+Integration test (build-tagged //go:build integration): connect to a real RedPanda/Kafka broker, produce + consume, verify JSON payload matches TickData
+Test observer wiring: FastTickStore.Update() triggers callback, verify tick reaches producer channel
+Extend config_test.go with RedPanda validation cases
+
+10. Update web UI config page in page.tsx
+
+Add RedPanda configuration section (brokers, topic, batch size) to the config form
+Update config.ts with RedPanda type definitions
+Show RedPanda connection status on the dashboard
+
+## Verification
+
+make test — all existing + new unit tests pass
+make build — binary compiles with franz-go dependency
+Manual: start with no redpanda: in config → exporter runs normally, no Kafka connection attempted
+Manual: add redpanda: config, restart → verify ticks arrive in RedPanda topic via rpk topic consume stock-ticks
+Manual: via /api/config PUT, add RedPanda config at runtime → verify producer starts and publishes
+Manual: via /api/config PUT, remove RedPanda config at runtime → verify producer stops cleanly
+Check Prometheus metrics: redpanda_ticks_published_total and redpanda_ticks_dropped_total are exposed
+
+## Decisions
+
+Observer on FastTickStore.Update() over fan-out at RingBuffer: cleaner separation, ticks are fully normalized with symbol names and ReceivedAt timestamps
+franz-go over confluent-kafka-go: pure Go (no CGo), first-class RedPanda support, superior performance benchmarks
+JSON serialization: cross-language compatible, human-debuggable via rpk, avoids proto codegen complexity
+Live reconfiguration: follows existing DataSourceManager.Reconfigure() pattern, enables enabling/disabling RedPanda without service restart
+Non-blocking enqueue with drop semantics: RedPanda backpressure must never slow down the tick ingestion pipeline (same philosophy as RingBuffer)
+
+## RedPanda Integration — Complete ✅
+
+### Files Created
+
+| File | Description |
+|------|-------------|
+| `internal/client/redpanda_producer.go` | 330-line producer: franz-go `kgo.Client`, non-blocking enqueue, async publish loop, TLS/SASL support, self-instrumentation Prometheus metrics, live reconfiguration via `UpdateConfig()` |
+| `internal/client/redpanda_producer_test.go` | Unit tests: non-blocking enqueue, drop semantics, observer callback wiring, nil-observer safety, tick message format |
+
+### Files Modified
+
+| File | Changes |
+|------|---------|
+| `config/config.go` | Added `RedPandaConfig`, `RedPandaTLS`, `RedPandaSASL` structs with `IsEnabled()`. Extended `Validate()` for broker addresses, compression types, SASL mechanisms, TLS file existence. Added env var overrides (`REDPANDA_BROKERS`, `REDPANDA_TOPIC`). Extended `DefaultConfig()` with zero-value RedPanda (disabled). |
+| `config/config_test.go` | 8 new tests: `TestRedPandaConfig_IsEnabled`, `TestValidate_RedPandaEmptyBroker`, `TestValidate_RedPandaBadCompression`, `TestValidate_RedPandaValidConfig`, `TestValidate_RedPandaBadSASL`, `TestLoadConfig_WithRedPanda`, `TestDefaultConfig_RedPandaDisabled` |
+| `internal/client/fast_tick_store.go` | Added `onUpdate func(*TickData)` observer field to struct. Added `SetOnUpdate(fn)` method. Observer fires after every version bump in `Update()` — non-blocking by contract. |
+| `internal/client/datasource_manager.go` | Added `producer *RedPandaProducer` field, `SetProducer()`/`Producer()` methods. Added `reconfigureRedPanda()` handling all 4 transitions: disabled→enabled (create+start), enabled→disabled (stop+nil), enabled→changed (stop+recreate), disabled→disabled (noop). Added `redpandaConfigChanged()` helper. |
+| `cmd/serve.go` | Creates and wires `RedPandaProducer` when `cfg.RedPanda.IsEnabled()`, attaches as `FastTickStore` observer via `SetOnUpdate(producer.Enqueue)`, passes to manager via `SetProducer()`. Graceful shutdown calls `producer.Stop()` (flush + close) before server shutdown. |
+| `internal/api/api.go` | Added `redpandaConfigResponse` to GET `/api/config`. Added RedPanda fields to `configUpdateRequest` for PUT `/api/config`. Added `redpanda_enabled`, `redpanda_published`, `redpanda_dropped`, `redpanda_running` to GET `/api/status`. |
+| `config.yaml` | Added commented-out `redpanda:` section with all options (brokers, topic, batch_size, linger_ms, compression, buffer_size, TLS, SASL) |
+| `config.tadawul.yaml` | Added commented-out `redpanda:` section |
+| `web/src/types/config.ts` | Added `RedPandaConfig` interface, added `redpanda` field to `AppConfig` |
+| `web/src/app/config/page.tsx` | Full RedPanda config UI section: enabled/disabled status badge, broker input (comma-separated), topic, batch size, linger ms, compression dropdown, buffer size |
+| `go.mod` | Added `github.com/twmb/franz-go v1.20.7` (pure Go Kafka client) |
+
+### Data Flow
+
+```
+DataSource → RingBuffer → IngestionPool → FastTickStore.Update()
+                                              ↓ (observer callback)
+                                       RedPandaProducer.Enqueue()
+                                              ↓ (async bounded channel)
+                                       publishLoop → RedPanda topic (JSON)
+```
+
+### How to Enable
+
+- **YAML config:** Uncomment and configure the `redpanda:` section in `config.yaml` / `config.tadawul.yaml`
+- **Environment variables:** `REDPANDA_BROKERS=host:9092` + `REDPANDA_TOPIC=stock-ticks`
+- **Web UI:** Configure brokers + topic in the Config page → Save Configuration
+- **Live via API:** `PUT /api/config` with `redpanda.brokers` and `redpanda.topic` fields — producer starts/stops without restart

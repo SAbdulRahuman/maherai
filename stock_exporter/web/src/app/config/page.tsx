@@ -124,6 +124,14 @@ export default function ConfigPage() {
     setConfig({ ...config, kite: { ...config.kite, [key]: value } });
   };
 
+  const updateRedPanda = <K extends keyof AppConfig["redpanda"]>(
+    key: K,
+    value: AppConfig["redpanda"][K]
+  ) => {
+    if (!config) return;
+    setConfig({ ...config, redpanda: { ...config.redpanda, [key]: value } });
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -306,6 +314,89 @@ export default function ConfigPage() {
             onChange={(e) => updateField("scrape_timeout", e.target.value)}
             className="input-field"
             placeholder="10s"
+          />
+        </Field>
+      </Section>
+
+      {/* RedPanda / Kafka Settings */}
+      <Section title="RedPanda / Kafka (Optional)">
+        <div className="col-span-full">
+          <div className={`inline-flex items-center gap-2 px-3 py-1 rounded-full text-sm font-medium ${
+            config.redpanda?.enabled
+              ? "bg-green-900/50 text-green-300 border border-green-800"
+              : "bg-slate-800 text-slate-400 border border-slate-700"
+          }`}>
+            <span className={`w-2 h-2 rounded-full ${config.redpanda?.enabled ? "bg-green-400" : "bg-slate-500"}`} />
+            {config.redpanda?.enabled ? "Connected" : "Disabled"}
+          </div>
+        </div>
+        <Field label="Brokers">
+          <input
+            type="text"
+            value={config.redpanda?.brokers?.join(", ") ?? ""}
+            onChange={(e) =>
+              updateRedPanda(
+                "brokers",
+                e.target.value
+                  .split(",")
+                  .map((s) => s.trim())
+                  .filter(Boolean)
+              )
+            }
+            className="input-field"
+            placeholder="localhost:9092, localhost:9093"
+          />
+          <p className="text-xs text-slate-500 mt-1">Comma-separated broker addresses</p>
+        </Field>
+        <Field label="Topic">
+          <input
+            type="text"
+            value={config.redpanda?.topic ?? ""}
+            onChange={(e) => updateRedPanda("topic", e.target.value)}
+            className="input-field"
+            placeholder="stock-ticks"
+          />
+        </Field>
+        <Field label="Batch Size">
+          <input
+            type="number"
+            value={config.redpanda?.batch_size ?? 1000}
+            onChange={(e) =>
+              updateRedPanda("batch_size", Number.parseInt(e.target.value) || 1000)
+            }
+            className="input-field"
+          />
+        </Field>
+        <Field label="Linger (ms)">
+          <input
+            type="number"
+            value={config.redpanda?.linger_ms ?? 5}
+            onChange={(e) =>
+              updateRedPanda("linger_ms", Number.parseInt(e.target.value) || 5)
+            }
+            className="input-field"
+          />
+        </Field>
+        <Field label="Compression">
+          <select
+            value={config.redpanda?.compression ?? "snappy"}
+            onChange={(e) => updateRedPanda("compression", e.target.value)}
+            className="input-field"
+          >
+            <option value="none">None</option>
+            <option value="snappy">Snappy</option>
+            <option value="lz4">LZ4</option>
+            <option value="zstd">Zstd</option>
+          </select>
+        </Field>
+        <Field label="Buffer Size">
+          <input
+            type="number"
+            value={config.redpanda?.buffer_size ?? 131072}
+            onChange={(e) =>
+              updateRedPanda("buffer_size", Number.parseInt(e.target.value) || 131072)
+            }
+            className="input-field"
           />
         </Field>
       </Section>

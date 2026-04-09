@@ -48,12 +48,14 @@ Modern financial markets suffer from:
 ### The Solution
 
 ```
-Market Data ──→ Prometheus ──→ Grafana ──→ AI Agents (Maher) ──→ Insights
-News Data   ──→ Loki       ──→ Grafana ──→ AI Agents (Maher) ──→ Decisions
+                         ┌──→ Prometheus/Thanos ──→ Grafana Dashboards
+Stock Exporter ──→ /metrics
+               ──→ RedPanda ──┬──→ AI Agents (Maher) ──→ Insights
+                              ├──→ ClickHouse / TimescaleDB (tick-level archive)
+                              └──→ Stream Processing (Flink, custom consumers)
 
-Market Data ──→ RedPanda ──→ Prometheus/Thanos ──→ Grafana (Grafana Dashboards)
-                         ──→ AI Agents (Maher) ──→ Insights
-News Data   ──→ RedPanda ──→ Loki       ──→ Grafana (Grafana Dashboards) ──→ AI Agents (Maher) ──→ Decisions
+News Ingestion ──→ RedPanda ──┬──→ Loki ──→ Grafana Dashboards
+                              └──→ AI Agents (Maher) ──→ Decisions
 ```
 
 <!-- ## Key Features
