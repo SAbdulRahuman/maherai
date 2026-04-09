@@ -2,19 +2,19 @@ listen_address: :9101
 metrics_path: /metrics
 exchange: NSE
 kite:
-    api_key: ""
-    api_secret: ""
-    access_token: ""
-    request_token: ""
+    api_key: kv8i33fc2z8qn1vr
+    api_secret: '****************************lib6'
+    access_token: n527j5cdnpHl5zJ0vRT6eHIA5NtBF3k5
+    request_token: 2Out91j93jHsbE4zR8mMfRhnKASVqtSP
     ticker_mode: full
     currency: INR
     max_reconnect_attempts: 50
     reconnect_interval: 5s
 stock_api_url: https://api.kite.trade
 api_key: ""
-api_secret: ""
+api_secret: '****'
 scrape_interval: 15s
-scrape_timeout: 10s
+scrape_timeout: 30s
 symbols:
     - 20MICRONS
     - 21STCENMGM

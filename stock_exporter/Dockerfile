@@ -37,8 +37,8 @@ RUN CGO_ENABLED=0 GOOS=linux go build \
 FROM gcr.io/distroless/static:nonroot
 
 COPY --from=builder /app/stock_exporter /usr/local/bin/stock_exporter
-COPY --from=builder /app/config.yaml /etc/stock_exporter/config.yaml
-COPY --from=builder /app/config.tadawul.yaml /etc/stock_exporter/config.tadawul.yaml
+COPY --from=builder --chown=nonroot:nonroot /app/config.yaml /etc/stock_exporter/config.yaml
+COPY --from=builder --chown=nonroot:nonroot /app/config.tadawul.yaml /etc/stock_exporter/config.tadawul.yaml
 
 EXPOSE 9101 9102
 

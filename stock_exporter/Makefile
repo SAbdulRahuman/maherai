@@ -16,7 +16,7 @@ LDFLAGS := -s -w \
 
 .PHONY: all build run test fmt lint vet clean docker docker-run tidy web-install web-build web-dev
 
-all: fmt vet web-build build
+all: fmt vet web-build build docker
 
 ## build: Compile the binary (assumes web-build has run)
 build:

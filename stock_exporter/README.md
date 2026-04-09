@@ -74,7 +74,7 @@ You need a [Kite Connect](https://developers.kite.trade/) developer account with
 Kite Connect uses an OAuth2 login flow. Open this URL in your browser (replace `YOUR_API_KEY` with your actual key):
 
 ```
-https://kite.zerodha.com/connect/login?v=3&api_key=YOUR_API_KEY
+https://kite.zerodha.com/connect/login?v=3&api_key=kv8i33fc2z8qn1vr
 ```
 
 1. Log in with your Zerodha credentials (client ID + password + 2FA).
@@ -259,6 +259,11 @@ watch -n 1 'curl -s http://localhost:9101/metrics | grep maher_stock_spread'
 # Print symbol, price, volume in a table format
 curl -s http://localhost:9101/metrics | grep maher_stock_price_current | \
   awk -F'[{}" ]' '{for(i=1;i<=NF;i++) if($i~/^symbol=/) print $(i+1), $NF}'
+```
+
+### Performance test (Curl /metrics with time in seconds)
+```sh
+$ curl -o /dev/null -s -w "HTTP Status: %{http_code}\nTime Total: %{time_total}s\nTime Connect: %{time_connect}s\nTime StartTransfer: %{time_starttransfer}s\n" http://localhost:9101/metrics
 ```
 
 ### 5. Test with Prometheus (optional)

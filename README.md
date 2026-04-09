@@ -2,6 +2,10 @@
 
 # Maher AI — QuantOps
 
+Maher AI – QuantOps Platform. “The Datadog for financial markets”, explain markets.
+
+Maher AI is a QuantOps platform that brings observability to financial markets. Just like engineers monitor systems using Prometheus and Grafana, traders can now monitor markets with real-time metrics, anomaly detection, and AI-driven insights.
+
 ### ماهر • The AI-Powered Financial Expert
 
 [![Status](https://img.shields.io/badge/Status-Phase%201%20%E2%80%93%20MVP-blue?style=flat-square)](#project-status)
@@ -46,6 +50,10 @@ Modern financial markets suffer from:
 ```
 Market Data ──→ Prometheus ──→ Grafana ──→ AI Agents (Maher) ──→ Insights
 News Data   ──→ Loki       ──→ Grafana ──→ AI Agents (Maher) ──→ Decisions
+
+Market Data ──→ RedPanda ──→ Prometheus/Thanos ──→ Grafana (Grafana Dashboards)
+                         ──→ AI Agents (Maher) ──→ Insights
+News Data   ──→ RedPanda ──→ Loki       ──→ Grafana (Grafana Dashboards) ──→ AI Agents (Maher) ──→ Decisions
 ```
 
 <!-- ## Key Features
