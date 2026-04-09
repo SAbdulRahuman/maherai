@@ -4,3 +4,6 @@
 [submodule "alertmanager"]
 	path = alertmanager
 	url = git@github.com:SAbdulRahuman/alertmanager.git
+[submodule "grafana"]
+	path = grafana
+	url = git@github.com:SAbdulRahuman/grafana.git
